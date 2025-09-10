@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Mobile App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Hero Section -->
+    <div class="hero">
+        <div class="logo">
+            <img src="images/1000166421.png" alt="MyApp Logo">
+        </div>
+        <button id="openWalletBtn" class="primary-btn" type="button">Connect Wallet</button>
+    </div>
+
+    <!-- TON Connect popup is handled by SDK; no custom modal here -->
+
+    <!-- Main Content -->
+    <div class="content">
+        <!-- Home Screen -->
+        <div id="home" class="screen active-screen">
+            <div class="blog-card">
+                <div class="glow-wrapper">
+                    <span class="glow"></span>
+                </div>
+                <div class="card-header">
+                    <h3>Get to Know Us</h3>
+                    <div class="card-badge">New</div>
+                </div>
+                <p>Welcome to IEPR Smart Network, powered by IND Empower, an innovative blockchain-driven organization dedicated to financial growth and digital empowerment.
+                    
+                    At IND Empower, we believe financial freedom and blockchain opportunities should be accessible, transparent, and built on technology you can trust. With this vision, we developed the IEPR Token and Smart Network on the ultra-secure TON Blockchain, combining cutting-edge crypto technology with a sustainable growth model.
+                    
+                    Our unique 1:3 referral framework with spillover rewards ensures every member benefits from fair placement, equal opportunities, and consistent financial growth. Through direct referral bonuses, team rewards, and monthly IEPR token incentives, we are creating a true crypto-financial ecosystem designed for long-term value, not just short-term gains.
+                    
+                    With simple wallet integration, fast TON transactions, liquidity support, and transparent tokenomics, IEPR offers a trusted crypto environment where anyone can earn, grow, and build wealth confidently.
+                    
+                    Join us today and be part of a smarter, more transparent blockchain future through the IEPR Token, powered by IND Empower.</p>
+            </div>
+            <div class="join-button-container">
+                <a href="https://community.example.com" target="_blank" class="join-button">
+                    <span class="button-text">Join Community</span>
+                    <span class="button-icon">→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Friends Screen -->
+        <div id="friends" class="screen">
+            <div class="referral-section">
+                <div class="section-header">
+                    <h2>Referral Network</h2>
+                    <div class="referral-stats">
+                        <div class="stat-item">
+                            <span class="stat-number">0</span>
+                            <span class="stat-label">Total Referrals</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="referral-link-container">
+                    <label>Your Referral Link:</label>
+                    <div class="referral-link">
+                        <a class="link-text" id="referralLinkAnchor" href="#" target="_blank" rel="noopener">Generating…</a>
+                        <button class="copy-btn" onclick="copyToClipboard()">📋</button>
+                    </div>
+                </div>
+                
+                <div class="level-buttons">
+                    <button class="level-btn active" data-level="L1">
+                        <span class="level-label">Level 1</span>
+                        <span class="level-count">0</span>
+                    </button>
+                    <button class="level-btn" data-level="L2">
+                        <span class="level-label">Level 2</span>
+                        <span class="level-count">0</span>
+                    </button>
+                </div>
+                
+                <div class="referral-list" id="referralList"></div>
+            </div>
+        </div>
+
+        <!-- Rewards Screen -->
+        <div id="rewards" class="screen">
+            <div class="rewards-container">
+                <div class="rewards-header">
+                    <h2>Earnings & Rewards</h2>
+                    <div class="rewards-icon">💰</div>
+                </div>
+                <div class="earnings-stats">
+                    <div class="earnings-card">
+                        <h3>Current Earnings</h3>
+                        <div class="earnings-amount" id="currentEarnings">$0.00</div>
+                    </div>
+                    <div class="earnings-card">
+                        <h3>Total Earnings</h3>
+                        <div class="earnings-amount" id="totalEarnings">$0.00</div>
+                    </div>
+                    <div class="earnings-card">
+                        <h3>Investment</h3>
+                        <div class="earnings-amount" id="investment">$30.00</div>
+                    </div>
+                    <div class="earnings-card">
+                        <h3>Coins</h3>
+                        <div class="earnings-amount" id="coins">300</div>
+                    </div>
+                </div>
+                <div class="data-section" id="monthlyClaimSection" style="margin-top:16px;">
+                    <h3>Monthly Coins Claim</h3>
+                    <p id="monthlyClaimInfo">Loading claim status...</p>
+                    <button id="claimMonthlyBtn" class="primary-btn" type="button" disabled>Claim Monthly Coins</button>
+                </div>
+                <div class="milestone-info">
+                    <h3>Milestone Bonuses</h3>
+                    <div class="milestone-item">
+                        <span>L1 Milestones (Every 5 referrals):</span>
+                        <span id="l1Milestones">0</span>
+                    </div>
+                    <div class="milestone-item">
+                        <span>L2 Milestones (Every 25 L2 referrals):</span>
+                        <span id="l2Milestones">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navbar -->
+    <div class="navbar">
+        <button id="homeBtn" class="nav-btn active">
+            <div class="nav-icon">🏠</div>
+            <span class="nav-label">Home</span>
+        </button>
+        <button id="friendsBtn" class="nav-btn">
+            <div class="nav-icon">👥</div>
+            <span class="nav-label">Friends</span>
+        </button>
+        <button id="rewardsBtn" class="nav-btn">
+            <div class="nav-icon">🏆</div>
+            <span class="nav-label">Rewards</span>
+        </button>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="referral-system-mongodb.js"></script>
+</body>
+</html>

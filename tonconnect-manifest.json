@@ -1,0 +1,10 @@
+{
+  "url": "{{APP_URL}}",
+  "name": "IEPR Smart Network",
+  "iconUrl": "{{APP_URL}}/images/1000166421.png",
+  "termsOfUseUrl": "{{APP_URL}}",
+  "privacyPolicyUrl": "{{APP_URL}}",
+  "bridgeUrl": "https://bridge.tonapi.io/bridge"
+}
+
+

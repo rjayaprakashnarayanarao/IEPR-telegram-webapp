@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IEPR Referral System - Admin Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0A0508;
+            color: #FFFFFF;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #5CC8FF;
+            margin-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: #1C0F13;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-card h3 {
+            color: #5CC8FF;
+            margin-bottom: 10px;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #80B192;
+        }
+
+        .data-section {
+            background: #1C0F13;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .data-section h2 {
+            color: #5CC8FF;
+            margin-bottom: 20px;
+        }
+
+        .user-item, .tree-item {
+            background: #161713;
+            padding: 16px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 3px solid #5CC8FF;
+        }
+
+        .user-item h4, .tree-item h4 {
+            color: #80B192;
+            margin-bottom: 5px;
+        }
+
+        .user-meta, .tree-meta {
+            font-size: 0.9em;
+            color: #B8B3BD;
+        }
+
+        /* Improved user item layout */
+        .user-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .user-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: radial-gradient(120% 120% at 10% 10%, rgba(92,200,255,0.25) 0%, rgba(128,177,146,0.2) 60%, rgba(255,255,255,0.05) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #EAF6FF;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(92, 200, 255, 0.12);
+            color: #5CC8FF;
+            font-size: 12px;
+            border: 1px solid rgba(92, 200, 255, 0.25);
+            white-space: nowrap;
+        }
+
+        .user-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 8px 16px;
+        }
+
+        .user-meta p {
+            margin: 0;
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+        .chip { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); }
+        .chip.positive { color: #80B192; border-color: rgba(128,177,146,0.35); background: rgba(128,177,146,0.12); }
+        .chip.info { color: #5CC8FF; border-color: rgba(92,200,255,0.35); background: rgba(92,200,255,0.12); }
+        .muted { opacity: 0.8; }
+        .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px; align-items: center; }
+        .kv strong { color: #DBE7FF; font-weight: 600; }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, #5CC8FF, #4BBEF5);
+            color: #0A0508;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .loading {
+            text-align: center;
+            color: #5CC8FF;
+            font-style: italic;
+        }
+
+        .error {
+            color: #F44336;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>IEPR Referral System</h1>
+            <p>Admin Dashboard - MongoDB Data</p>
+        </div>
+
+        <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Users</h3>
+                <div class="stat-number" id="totalUsers">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Investment</h3>
+                <div class="stat-number" id="totalInvestment">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>L1 Referrals</h3>
+                <div class="stat-number" id="totalL1Referrals">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>L2 Referrals</h3>
+                <div class="stat-number" id="totalL2Referrals">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Earnings</h3>
+                <div class="stat-number" id="totalEarnings">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Coins</h3>
+                <div class="stat-number" id="totalCoins">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Claimable Coins (Now)</h3>
+                <div class="stat-number" id="totalClaimableCoins">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Unclaimed Coins (Pending)</h3>
+                <div class="stat-number" id="totalUnclaimedCoins">-</div>
+            </div>
+        </div>
+
+        <div class="data-section">
+            <h2>All Users</h2>
+            <div id="usersList" class="loading">Loading users...</div>
+        </div>
+
+    </div>
+
+    <script src="referral-system-mongodb.js"></script>
+    <script>
+        async function loadData() {
+            try {
+                // Load users
+                const users = await window.referralSystemMongoDB.getAllUsers();
+
+                // Update stats
+                document.getElementById('totalUsers').textContent = users.length;
+                
+                let totalInvestment = 0;
+                let totalL1Referrals = 0;
+                let totalL2Referrals = 0;
+                let totalEarnings = 0;
+                let totalCoins = 0;
+                let totalClaimableCoins = 0;
+                let totalUnclaimedCoins = 0;
+                
+                users.forEach(user => {
+                    totalInvestment += Number(user.investment || 0);
+                    totalL1Referrals += Array.isArray(user?.referrals?.L1) ? user.referrals.L1.length : 0;
+                    totalL2Referrals += Array.isArray(user?.referrals?.L2) ? user.referrals.L2.length : 0;
+                    totalEarnings += Number(user.totalEarnings || 0);
+                    totalCoins += Number(user.coins || 0);
+                    totalUnclaimedCoins += Number(user.monthlyClaimPending || 0);
+                });
+
+                // Compute claimable now based on monthly drip (limit/12) and remaining
+                const now = new Date();
+                users.forEach(user => {
+                    const last = user.lastMonthlyClaim ? new Date(user.lastMonthlyClaim) : null;
+                    let canClaim = false;
+                    if (!last || isNaN(last.getTime())) {
+                        canClaim = true;
+                    } else {
+                        const months = (now.getFullYear() - last.getFullYear()) * 12 + (now.getMonth() - last.getMonth());
+                        canClaim = Number.isFinite(months) && months >= 1;
+                    }
+                    const totalLimit = Number(user.coinLimitTotal || 300);
+                    const claimedSoFar = Number(user.coinLimitClaimed || 0);
+                    const remaining = Math.max(0, totalLimit - claimedSoFar);
+                    const monthlyTarget = Math.ceil(totalLimit / 12);
+                    const base = canClaim ? Math.min(monthlyTarget, remaining) : 0;
+                    totalClaimableCoins += base;
+                    totalUnclaimedCoins += remaining;
+                });
+
+                document.getElementById('totalInvestment').textContent = '$' + totalInvestment.toFixed(2);
+                document.getElementById('totalL1Referrals').textContent = totalL1Referrals;
+                document.getElementById('totalL2Referrals').textContent = totalL2Referrals;
+                document.getElementById('totalEarnings').textContent = '$' + totalEarnings.toFixed(2);
+                document.getElementById('totalCoins').textContent = totalCoins.toLocaleString();
+                document.getElementById('totalClaimableCoins').textContent = totalClaimableCoins.toLocaleString();
+                document.getElementById('totalUnclaimedCoins').textContent = totalUnclaimedCoins.toLocaleString();
+
+                // Display users
+                const usersList = document.getElementById('usersList');
+                if (!Array.isArray(users) || users.length === 0) {
+                    usersList.innerHTML = '<p class="error">No users found</p>';
+                } else {
+                    usersList.innerHTML = users.map(user => {
+                        const username = user.username || user.telegramUsername || null;
+                        const title = username ? (username.startsWith('@') ? username : `@${username}`) : (user.telegramId || `User ${user._id}`);
+                        const referrer = (user.referrerId && (user.referrerId._id || user.referrerId)) || 'None';
+                        const initials = (() => {
+                            const base = (username || String(user.telegramId || 'U')).replace('@','').trim();
+                            const parts = base.split(/\s|_|\./).filter(Boolean);
+                            const first = parts[0] ? parts[0][0] : base[0];
+                            const second = parts[1] ? parts[1][0] : (base.length > 1 ? base[1] : '');
+                            return (first + second).toUpperCase();
+                        })();
+                        const l1 = Array.isArray(user?.referrals?.L1) ? user.referrals.L1.length : 0;
+                        const l2 = Array.isArray(user?.referrals?.L2) ? user.referrals.L2.length : 0;
+                        const walletAddr = user.wallet && user.wallet.address ? String(user.wallet.address) : null;
+                        const shortAddr = walletAddr ? `${walletAddr.slice(0,6)}…${walletAddr.slice(-6)}` : null;
+
+                        return `
+                        <div class="user-item">
+                            <div class="user-header">
+                                <div class="user-title">
+                                    <div class="avatar">${initials}</div>
+                                    <div>
+                                        <h4 style="margin:0">${title}</h4>
+                                        <div class="muted" style="font-size:12px"><span class="mono">${user._id}</span></div>
+                                    </div>
+                                </div>
+                                <div class="chips">
+                                    <span class="chip info">Coins: ${Number(user.coins || 0).toLocaleString()}</span>
+                                    <span class="chip">L1: ${l1}</span>
+                                    <span class="chip">L2: ${l2}</span>
+                                    <span class="chip ${walletAddr ? 'positive' : ''}">${walletAddr ? 'Wallet: Connected' : 'Wallet: Not Connected'}</span>
+                                </div>
+                            </div>
+                            <div class="user-meta user-grid">
+                                <div class="kv"><strong>Telegram</strong><div>${username ? (username.startsWith('@') ? username : `@${username}`) : (user.telegramId || 'N/A')}</div></div>
+                                <div class="kv"><strong>Referrer</strong><div class="mono">${referrer}</div></div>
+                                <div class="kv"><strong>Investment</strong><div>$${Number(user.investment || 0).toFixed(2)}</div></div>
+                                <div class="kv"><strong>Current</strong><div>$${Number(user.earnings || 0).toFixed(2)}</div></div>
+                                <div class="kv"><strong>Total</strong><div>$${Number(user.totalEarnings || 0).toFixed(2)}</div></div>
+                                <div class="kv"><strong>Joined</strong><div>${user.joinDate ? new Date(user.joinDate).toLocaleDateString() : 'N/A'}</div></div>
+                                <div class="kv"><strong>Wallet</strong><div>${shortAddr ? `<span class=\"mono\" title=\"${walletAddr}\">${shortAddr}</span>` : 'Not connected'}</div></div>
+                                <div class="kv"><strong>Network</strong><div>${user.wallet && user.wallet.network ? user.wallet.network : '-'}</div></div>
+                                <div class="kv"><strong>Provider</strong><div>${user.wallet && user.wallet.provider ? user.wallet.provider : '-'}</div></div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('usersList').innerHTML = '<p class="error">Error loading users. Make sure the server is running.</p>';
+            }
+        }
+
+        async function refreshData() {
+            document.getElementById('usersList').innerHTML = '<div class="loading">Refreshing...</div>';
+            await loadData();
+        }
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "name": "iepr-referral-system",
+  "version": "1.0.0",
+  "description": "IEPR Smart Network Referral System with MongoDB",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "bot": "node telegram/bot.js"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "mongoose": "^7.5.0",
+    "ngrok": "^5.0.0-beta.2",
+    "node-fetch": "^2.7.0",
+    "node-telegram-bot-api": "^0.66.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "referral",
+    "blockchain",
+    "ton",
+    "mongodb"
+  ],
+  "author": "IEPR Team",
+  "license": "MIT"
+}
