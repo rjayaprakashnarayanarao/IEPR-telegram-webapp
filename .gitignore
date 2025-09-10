@@ -1,5 +1,47 @@
-# Environment variables
+# Environment
 .env
+.env.*.local
 
-# Node.js dependencies
+# Dependencies
 /node_modules
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors/IDEs
+.vscode/
+.idea/
+*.iml
+
+# Coverage / reports
+coverage/
+.nyc_output/
+
+# Caches
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Build outputs (if you add a build step later)
+dist/
+build/
+out/
+
+# Process IDs
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Misc local files
+*.local

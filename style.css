@@ -684,6 +684,65 @@ body {
     color: var(--color-accent);
 }
 
+/* Rewards: Data Section (Monthly Coins Claim) */
+.data-section {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    text-align: left;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "title title"
+        "info action";
+    gap: var(--space-3) var(--space-4);
+    position: relative;
+}
+
+.data-section h3 {
+    grid-area: title;
+    margin: 0;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+}
+
+.data-section p {
+    grid-area: info;
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-relaxed);
+}
+
+.data-section .primary-btn {
+    grid-area: action;
+    align-self: center;
+    justify-self: end;
+}
+
+.data-section::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
+}
+
+#claimMonthlyBtn[disabled] {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+#monthlyClaimSection:hover {
+    box-shadow: var(--shadow-sm);
+}
+
 .milestone-info {
     background: var(--color-bg-secondary);
     padding: var(--space-4);

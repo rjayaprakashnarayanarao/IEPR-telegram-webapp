@@ -8,14 +8,28 @@ const levelUsers = {
     L2: []
 };
 
+// Ensure there is a user selected/created (dev-friendly)
+async function ensureUserExists() {
+    try {
+        let currentUserId = window.referralSystemMongoDB.getCurrentUser();
+        if (currentUserId) return currentUserId;
+        // Attempt a lightweight local user creation (no Telegram context)
+        const user = await window.referralSystemMongoDB.createUser(null, null);
+        return user && user._id ? user._id : window.referralSystemMongoDB.getCurrentUser();
+    } catch (e) {
+        console.warn('ensureUserExists failed:', e);
+        return null;
+    }
+}
+
 // Function to update user data from referral system
 async function updateUserDataFromReferralSystem() {
     try {
-        // Get current user ID from MongoDB system
+        // Get or create current user ID
         let currentUserId = window.referralSystemMongoDB.getCurrentUser();
         if (!currentUserId) {
-            // No current user; skip fetching until real user is set
-            return;
+            currentUserId = await ensureUserExists();
+            if (!currentUserId) return;
         }
 
         const userStats = await window.referralSystemMongoDB.getUserStats(currentUserId);
@@ -332,10 +346,18 @@ function updateEarningsDisplay(userStats) {
 // Refresh monthly claim status (base + pending) and enable/disable claim button
 async function refreshMonthlyClaimStatus() {
     try {
-        const userId = window.referralSystemMongoDB.getCurrentUser();
+        let userId = window.referralSystemMongoDB.getCurrentUser();
         const infoEl = document.getElementById('monthlyClaimInfo');
         const btn = document.getElementById('claimMonthlyBtn');
-        if (!userId || !infoEl || !btn) return;
+        if (!infoEl || !btn) return;
+        if (!userId) {
+            userId = await ensureUserExists();
+            if (!userId) {
+                infoEl.textContent = 'Sign in to see your monthly claim status.';
+                btn.disabled = true;
+                return;
+            }
+        }
         const status = await window.referralSystemMongoDB.getMonthlyClaimStatus(userId);
         if (!status) return;
         infoEl.textContent = `Claimable now: ${status.totalClaimable} coins (Base: ${status.base}, Bonus: ${status.pending}).`;
@@ -576,6 +598,7 @@ window.debugReferralData = debugReferralData;
 // Add smooth scrolling for better UX
 document.addEventListener('DOMContentLoaded', async () => {
     // Initialize referral system data
+    await ensureUserExists();
     await updateUserDataFromReferralSystem();
     // Ensure referral link text updates even after initial demo init path
     await loadReferralLink();
