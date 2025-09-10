@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: iepr-referral-system
+    env: node
+    plan: free
+    buildCommand: npm install && npm run render-build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: MONGODB_URI
+        sync: false
+      - key: BOT_USERNAME
+        sync: false
+      - key: ENABLE_TELEGRAM_BOT
+        value: "false"
+    autoDeploy: true
+    healthCheckPath: /healthz
+    routes:
+      - type: rewrite
+        source: /
+        destination: /
+
