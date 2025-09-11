@@ -9,6 +9,19 @@ const levelUsers = {
 };
 
 // Ensure there is a user selected/created (dev-friendly)
+function setReferralLinkMessage(message) {
+    try {
+        const anchor = document.getElementById('referralLinkAnchor');
+        if (anchor) {
+            anchor.textContent = message;
+            anchor.removeAttribute('href');
+        } else {
+            const linkTextElement = document.querySelector('.link-text');
+            if (linkTextElement) linkTextElement.textContent = message;
+        }
+    } catch {}
+}
+
 async function ensureUserExists() {
     try {
         let currentUserId = window.referralSystemMongoDB.getCurrentUser();
@@ -18,6 +31,8 @@ async function ensureUserExists() {
         return user && user._id ? user._id : window.referralSystemMongoDB.getCurrentUser();
     } catch (e) {
         console.warn('ensureUserExists failed:', e);
+        // If API is not ready (e.g., 503 from guarded backend), inform the user visibly
+        setReferralLinkMessage('Server initializing. Please try again shortly.');
         return null;
     }
 }
@@ -385,7 +400,10 @@ async function loadReferralLink() {
             } catch (e) {
                 console.warn('Auto-create before loading referral link (no user) failed:', e);
             }
-            if (!userId) return;
+            if (!userId) {
+                setReferralLinkMessage('Server initializing. Please try again shortly.');
+                return;
+            }
         }
         let link = await window.referralSystemMongoDB.getReferralLink(userId);
         if (!link) {
@@ -413,12 +431,14 @@ async function loadReferralLink() {
             anchor.href = link;
         } else if (linkTextElement && link) {
             linkTextElement.textContent = link;
+        } else if (!link) {
+            setReferralLinkMessage('Server initializing. Please try again shortly.');
         }
     } catch (error) {
         console.error('Error loading referral link:', error);
         const linkTextElement = document.querySelector('.link-text');
         if (linkTextElement) {
-            linkTextElement.textContent = 'Loading referral link...';
+            linkTextElement.textContent = 'Server initializing. Please try again shortly.';
         }
     }
 }
