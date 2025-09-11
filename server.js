@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const https = require('https');
 require('dotenv').config();
 
 const app = express();
@@ -73,5 +74,24 @@ app.listen(PORT, () => {
         }
     } else {
         console.log('Telegram bot disabled. Set ENABLE_TELEGRAM_BOT=true to enable.');
+    }
+
+    // Keep-alive ping to prevent server from idling
+    const keepAliveUrl = process.env.KEEPALIVE_URL;
+    if (keepAliveUrl) {
+        const ping = () => {
+            https
+                .get(keepAliveUrl, (res) => {
+                    console.log(`Pinged server: Status Code ${res.statusCode}`);
+                })
+                .on('error', (err) => {
+                    console.error('Error pinging server:', err.message);
+                });
+        };
+        // Initial ping and schedule every 5 minutes
+        ping();
+        setInterval(ping, 12 * 60 * 1000);
+    } else {
+        console.log('KEEPALIVE_URL not set; skipping keep-alive pings.');
     }
 });
