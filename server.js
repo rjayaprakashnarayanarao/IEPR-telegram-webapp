@@ -45,8 +45,21 @@ connectToMongo();
 // Import routes
 const referralRoutes = require('./routes/referralRoutes');
 
-// Use routes
-app.use('/api/referrals', referralRoutes);
+// Protect DB-dependent routes when DB is not connected/misconfigured
+function requireDatabase(req, res, next) {
+    if (!MONGODB_URI) {
+        return res.status(503).json({ error: 'Database not configured. Set MONGODB_URI.' });
+    }
+    // 1 = connected, 2 = connecting, others mean not ready
+    const state = mongoose.connection.readyState;
+    if (state !== 1) {
+        return res.status(503).json({ error: 'Database not connected. Please try again shortly.' });
+    }
+    next();
+}
+
+// Use routes (guarded by DB readiness)
+app.use('/api/referrals', requireDatabase, referralRoutes);
 
 // Health check (for Render)
 app.get('/healthz', (req, res) => {
