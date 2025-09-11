@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const https = require('https');
+const http = require('http');
 require('dotenv').config();
 
 const app = express();
@@ -80,15 +81,27 @@ app.listen(PORT, () => {
     const keepAliveUrl = process.env.KEEPALIVE_URL;
     if (keepAliveUrl) {
         const ping = () => {
-            https
-                .get(keepAliveUrl, (res) => {
+            try {
+                const isHttps = keepAliveUrl.startsWith('https://');
+                const client = isHttps ? https : http;
+                const req = client.get(keepAliveUrl, {
+                    headers: { 'User-Agent': 'keepalive-pinger/1.0' }
+                }, (res) => {
                     console.log(`Pinged server: Status Code ${res.statusCode}`);
-                })
-                .on('error', (err) => {
+                    // Consume response to free sockets
+                    res.resume();
+                });
+                req.setTimeout(5000, () => {
+                    req.destroy(new Error('Ping request timed out'));
+                });
+                req.on('error', (err) => {
                     console.error('Error pinging server:', err.message);
                 });
+            } catch (e) {
+                console.error('Keep-alive ping failed to start:', e.message);
+            }
         };
-        // Initial ping and schedule every 5 minutes
+        // Initial ping and schedule every 12 minutes (adjust as needed for host policy)
         ping();
         setInterval(ping, 12 * 60 * 1000);
     } else {
