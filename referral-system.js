@@ -264,14 +264,6 @@ class ReferralSystem {
 // Initialize referral system
 const referralSystem = new ReferralSystem();
 
-// Create some demo users if none exist
-if (referralSystem.users.size === 0) {
-    const user1 = referralSystem.createUser('telegram_123', null);
-    const user2 = referralSystem.createUser('telegram_456', user1.id);
-    const user3 = referralSystem.createUser('telegram_789', user1.id);
-    const user4 = referralSystem.createUser('telegram_101', user2.id);
-}
-
 // Telegram Bot Integration Helper Functions
 window.telegramIntegration = {
     // Initialize bot when user starts the bot

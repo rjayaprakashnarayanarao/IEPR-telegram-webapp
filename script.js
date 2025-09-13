@@ -26,8 +26,36 @@ async function ensureUserExists() {
     try {
         let currentUserId = window.referralSystemMongoDB.getCurrentUser();
         if (currentUserId) return currentUserId;
-        // Attempt a lightweight local user creation (no Telegram context)
-        const user = await window.referralSystemMongoDB.createUser(null, null);
+        
+        // Try to get Telegram WebApp data if available
+        let telegramId = null;
+        let username = null;
+        let referrerId = null;
+        
+        // Check if we're in Telegram WebApp
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            telegramId = tg.initDataUnsafe?.user?.id?.toString() || null;
+            username = tg.initDataUnsafe?.user?.username || null;
+            
+            // Check for referral parameter in start_param
+            const startParam = tg.initDataUnsafe?.start_param;
+            if (startParam && startParam.startsWith('ref_')) {
+                const referralCode = startParam.substring(4);
+                try {
+                    const response = await fetch(`${window.referralSystemMongoDB.apiBase}/referral-code/${referralCode}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        referrerId = data.userId;
+                    }
+                } catch (e) {
+                    console.warn('Failed to resolve referral code:', e);
+                }
+            }
+        }
+        
+        // Create user with available data
+        const user = await window.referralSystemMongoDB.createUser(telegramId, referrerId, username);
         return user && user._id ? user._id : window.referralSystemMongoDB.getCurrentUser();
     } catch (e) {
         console.warn('ensureUserExists failed:', e);
@@ -630,42 +658,44 @@ document.addEventListener('DOMContentLoaded', async () => {
             webApp.ready();
             // Expand app to full height
             if (webApp.expand) webApp.expand();
-            // Parse referral code from start_param (WebApp only passes initData; use URL as fallback)
-            const urlParams = new URLSearchParams(window.location.search);
-            const startAppParam = urlParams.get('tgWebAppStartParam');
-            if (startAppParam && startAppParam.startsWith('ref_')) {
-                const refCode = startAppParam.substring(4);
-                // If no current user yet, process referral with placeholder telegramId from WebApp
-                const currentUserId = window.referralSystemMongoDB.getCurrentUser();
-                if (!currentUserId) {
-                    const telegramId = (webApp.initDataUnsafe && webApp.initDataUnsafe.user && webApp.initDataUnsafe.user.id)
-                        ? String(webApp.initDataUnsafe.user.id)
-                        : null;
-                    if (telegramId) {
-                        try {
-                            await window.referralSystemMongoDB.processReferral(telegramId, refCode);
-                            await updateUserDataFromReferralSystem();
-                        } catch (e) {
-                            console.error('Failed processing referral via WebApp:', e);
-                        }
+            // Parse referral code from start_param
+            const startParam = webApp.initDataUnsafe?.start_param;
+            let referrerId = null;
+            let refCode = null;
+            
+            if (startParam && startParam.startsWith('ref_')) {
+                refCode = startParam.substring(4);
+                try {
+                    const response = await fetch(`${window.referralSystemMongoDB.apiBase}/referral-code/${refCode}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        referrerId = data.userId;
                     }
+                } catch (e) {
+                    console.warn('Failed to resolve referral code:', e);
                 }
             }
-            // If still no current user, ensure account exists without referral
-            const ensureUserId = window.referralSystemMongoDB.getCurrentUser();
-            if (!ensureUserId) {
-                const fromUser = webApp.initDataUnsafe && webApp.initDataUnsafe.user ? webApp.initDataUnsafe.user : null;
-                const telegramId = fromUser && fromUser.id ? String(fromUser.id) : null;
-                const username = fromUser && fromUser.username ? String(fromUser.username) : undefined;
-                if (telegramId) {
-                    try {
-                        await window.referralSystemMongoDB.processReferral(telegramId, null);
-                        // Also send username to backend by creating/updating user via process-referral
-                        // processReferral already supports username when called from bot; here we can call createUser as fallback
-                        await updateUserDataFromReferralSystem();
-                    } catch (e) {
-                        console.warn('Auto-create user without referral failed:', e);
-                    }
+            
+            // Get user data from Telegram
+            const fromUser = webApp.initDataUnsafe?.user;
+            const telegramId = fromUser?.id ? String(fromUser.id) : null;
+            const username = fromUser?.username || null;
+            
+            console.log('Telegram WebApp data:', {
+                user: fromUser,
+                startParam,
+                refCode,
+                referrerId
+            });
+            
+            // If we have Telegram data, create/update user with it
+            if (telegramId) {
+                try {
+                    // Use processReferral which handles both new and existing users
+                    await window.referralSystemMongoDB.processReferral(telegramId, refCode, username);
+                    await updateUserDataFromReferralSystem();
+                } catch (e) {
+                    console.error('Failed processing Telegram user:', e);
                 }
             }
         }

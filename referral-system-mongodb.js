@@ -19,7 +19,7 @@ class ReferralSystemMongoDB {
     }
 
     // Create a new user
-    async createUser(telegramId = null, referrerId = null) {
+    async createUser(telegramId = null, referrerId = null, username = null) {
         try {
             const response = await fetch(`${this.apiBase}/users`, {
                 method: 'POST',
@@ -28,7 +28,8 @@ class ReferralSystemMongoDB {
                 },
                 body: JSON.stringify({
                     telegramId,
-                    referrerId
+                    referrerId,
+                    username
                 })
             });
 
@@ -138,7 +139,7 @@ class ReferralSystemMongoDB {
     }
 
     // Process referral code (for Telegram integration)
-    async processReferral(telegramId, referralCode = null) {
+    async processReferral(telegramId, referralCode = null, username = null) {
         try {
             const response = await fetch(`${this.apiBase}/process-referral`, {
                 method: 'POST',
@@ -147,7 +148,8 @@ class ReferralSystemMongoDB {
                 },
                 body: JSON.stringify({
                     telegramId,
-                    referralCode
+                    referralCode,
+                    username
                 })
             });
 

@@ -30,6 +30,7 @@ async function connectToMongo() {
             serverSelectionTimeoutMS: 5000,
             socketTimeoutMS: 45000,
             bufferCommands: false,
+            dbName: 'iepr_system'
         });
         const db = mongoose.connection;
         console.log('Connected to MongoDB successfully!');
