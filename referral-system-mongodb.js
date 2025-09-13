@@ -1,20 +1,19 @@
 // MongoDB-based Referral System
 class ReferralSystemMongoDB {
     constructor() {
-        // Use current origin by default so it works behind Cloudflare Tunnel/HTTPS
+        // Set API base URL
         try {
-            const origin = window.location && window.location.origin ? window.location.origin : '';
+            const origin = window.location?.origin || '';
             const override = window.__API_BASE__ || '';
             this.apiBase = (override || `${origin}/api/referrals`).replace(/\/$/, '');
-        } catch (e) {
+        } catch {
             this.apiBase = 'http://localhost:3000/api/referrals';
         }
+        
+        // Load current user from localStorage
         this.currentUserId = null;
         try {
-            const storedId = localStorage.getItem('currentUserId');
-            if (storedId) {
-                this.currentUserId = storedId;
-            }
+            this.currentUserId = localStorage.getItem('currentUserId');
         } catch {}
     }
 
@@ -39,8 +38,7 @@ class ReferralSystemMongoDB {
 
             const user = await response.json();
             if (!this.currentUserId) {
-                this.currentUserId = user._id;
-                try { localStorage.setItem('currentUserId', this.currentUserId); } catch {}
+                this.setCurrentUser(user._id);
             }
             return user;
         } catch (error) {
@@ -54,9 +52,7 @@ class ReferralSystemMongoDB {
         try {
             const response = await fetch(`${this.apiBase}/users/${userId}/stats`);
             if (response.status === 404) {
-                // User not found: clear stale current user
-                try { localStorage.removeItem('currentUserId'); } catch {}
-                this.currentUserId = null;
+                this.setCurrentUser(null);
                 return null;
             }
             if (!response.ok) {
@@ -92,8 +88,7 @@ class ReferralSystemMongoDB {
             }
             const response = await fetch(`${this.apiBase}/users/${userId}/referral-link`);
             if (response.status === 404) {
-                try { localStorage.removeItem('currentUserId'); } catch {}
-                this.currentUserId = null;
+                this.setCurrentUser(null);
                 return null;
             }
             if (!response.ok) {
@@ -112,8 +107,7 @@ class ReferralSystemMongoDB {
         try {
             const response = await fetch(`${this.apiBase}/users/${userId}/monthly-claim`);
             if (response.status === 404) {
-                try { localStorage.removeItem('currentUserId'); } catch {}
-                this.currentUserId = null;
+                this.setCurrentUser(null);
                 return null;
             }
             if (!response.ok) throw new Error('Failed to get monthly claim');
@@ -160,9 +154,8 @@ class ReferralSystemMongoDB {
             const data = await response.json();
             
             // Always set current user from API response
-            if (data && data.user && data.user._id) {
-                this.currentUserId = data.user._id;
-                try { localStorage.setItem('currentUserId', this.currentUserId); } catch {}
+            if (data?.user?._id) {
+                this.setCurrentUser(data.user._id);
             }
             
             return data;
@@ -197,30 +190,23 @@ class ReferralSystemMongoDB {
             });
             if (!response.ok) throw new Error('Failed to update wallet');
             return await response.json();
-        } catch (e) {
-            console.error('Error updating user wallet:', e);
-            throw e;
+        } catch (error) {
+            console.error('Error updating user wallet:', error);
+            throw error;
         }
     }
 
-    // Get all trees (for admin)
-    async getAllTrees() {
-        try {
-            const response = await fetch(`${this.apiBase}/trees`);
-            if (!response.ok) {
-                throw new Error('Failed to get all trees');
-            }
-            return await response.json();
-        } catch (error) {
-            console.error('Error getting all trees:', error);
-            return [];
-        }
-    }
 
     // Set current user ID
     setCurrentUser(userId) {
         this.currentUserId = userId;
-        try { localStorage.setItem('currentUserId', this.currentUserId); } catch {}
+        try {
+            if (userId) {
+                localStorage.setItem('currentUserId', userId);
+            } else {
+                localStorage.removeItem('currentUserId');
+            }
+        } catch {}
     }
 
     // Get current user ID
@@ -228,21 +214,6 @@ class ReferralSystemMongoDB {
         return this.currentUserId;
     }
 
-    // Ensure there is a current user; do not create or auto-select in production
-    async ensureCurrentUser() {
-        if (this.currentUserId) return this.currentUserId;
-        try {
-            const users = await this.getAllUsers();
-            if (Array.isArray(users) && users.length > 0) {
-                // In real mode, do not auto-pick a user silently
-                return null;
-            }
-            return null;
-        } catch (e) {
-            console.error('ensureCurrentUser failed:', e);
-            return null;
-        }
-    }
 }
 
 // Initialize MongoDB referral system

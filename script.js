@@ -27,35 +27,14 @@ async function ensureUserExists() {
         let currentUserId = window.referralSystemMongoDB.getCurrentUser();
         if (currentUserId) return currentUserId;
         
-        // Try to get Telegram WebApp data if available
-        let telegramId = null;
-        let username = null;
-        let referrerId = null;
-        
-        // Check if we're in Telegram WebApp
+        // Don't create users in Telegram WebApp context - that should be handled by Telegram integration
         if (window.Telegram && window.Telegram.WebApp) {
-            const tg = window.Telegram.WebApp;
-            telegramId = tg.initDataUnsafe?.user?.id?.toString() || null;
-            username = tg.initDataUnsafe?.user?.username || null;
-            
-            // Check for referral parameter in start_param
-            const startParam = tg.initDataUnsafe?.start_param;
-            if (startParam && startParam.startsWith('ref_')) {
-                const referralCode = startParam.substring(4);
-                try {
-                    const response = await fetch(`${window.referralSystemMongoDB.apiBase}/referral-code/${referralCode}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        referrerId = data.userId;
-                    }
-                } catch (e) {
-                    console.warn('Failed to resolve referral code:', e);
-                }
-            }
+            console.log('ensureUserExists: Skipping user creation in Telegram WebApp context');
+            return null;
         }
         
-        // Create user with available data
-        const user = await window.referralSystemMongoDB.createUser(telegramId, referrerId, username);
+        // For non-Telegram contexts, create a basic user
+        const user = await window.referralSystemMongoDB.createUser(null, null, null);
         return user && user._id ? user._id : window.referralSystemMongoDB.getCurrentUser();
     } catch (e) {
         console.warn('ensureUserExists failed:', e);
@@ -626,14 +605,25 @@ async function debugReferralData() {
         console.log('=== MONGODB REFERRAL SYSTEM DEBUG ===');
         
         const allUsers = await window.referralSystemMongoDB.getAllUsers();
-        const allTrees = await window.referralSystemMongoDB.getAllTrees();
         const currentUserId = window.referralSystemMongoDB.getCurrentUser();
         const userStats = currentUserId ? await window.referralSystemMongoDB.getUserStats(currentUserId) : null;
         
         console.log('All Users:', allUsers);
-        console.log('All Trees:', allTrees);
         console.log('Current User ID:', currentUserId);
         console.log('User Stats:', userStats);
+        
+        // Check for referral relationships
+        if (allUsers && allUsers.length > 0) {
+            console.log('=== REFERRAL RELATIONSHIPS ===');
+            allUsers.forEach(user => {
+                console.log(`User ${user._id} (${user.telegramId || 'No Telegram ID'}):`, {
+                    referrerId: user.referrerId,
+                    L1Referrals: user.referrals?.L1?.length || 0,
+                    L2Referrals: user.referrals?.L2?.length || 0,
+                    referralCode: user.referralCode
+                });
+            });
+        }
         console.log('=====================================');
     } catch (error) {
         console.error('Error in debug function:', error);
@@ -645,12 +635,6 @@ window.debugReferralData = debugReferralData;
 
 // Add smooth scrolling for better UX
 document.addEventListener('DOMContentLoaded', async () => {
-    // Initialize referral system data
-    await ensureUserExists();
-    await updateUserDataFromReferralSystem();
-    // Ensure referral link text updates even after initial demo init path
-    await loadReferralLink();
-
     // Telegram WebApp integration: parse startapp param if available
     try {
         if (window.Telegram && window.Telegram.WebApp) {
@@ -658,49 +642,58 @@ document.addEventListener('DOMContentLoaded', async () => {
             webApp.ready();
             // Expand app to full height
             if (webApp.expand) webApp.expand();
-            // Parse referral code from start_param
-            const startParam = webApp.initDataUnsafe?.start_param;
-            let referrerId = null;
-            let refCode = null;
-            
-            if (startParam && startParam.startsWith('ref_')) {
-                refCode = startParam.substring(4);
-                try {
-                    const response = await fetch(`${window.referralSystemMongoDB.apiBase}/referral-code/${refCode}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        referrerId = data.userId;
-                    }
-                } catch (e) {
-                    console.warn('Failed to resolve referral code:', e);
-                }
-            }
             
             // Get user data from Telegram
             const fromUser = webApp.initDataUnsafe?.user;
             const telegramId = fromUser?.id ? String(fromUser.id) : null;
             const username = fromUser?.username || null;
+            const startParam = webApp.initDataUnsafe?.start_param;
+            let refCode = null;
+            
+            // Parse referral code from start_param
+            if (startParam && startParam.startsWith('ref_')) {
+                refCode = startParam.substring(4);
+            }
             
             console.log('Telegram WebApp data:', {
                 user: fromUser,
                 startParam,
                 refCode,
-                referrerId
+                telegramId,
+                username
             });
             
-            // If we have Telegram data, create/update user with it
+            // If we have Telegram data, process referral first (this handles both new and existing users)
             if (telegramId) {
                 try {
-                    // Use processReferral which handles both new and existing users
                     await window.referralSystemMongoDB.processReferral(telegramId, refCode, username);
                     await updateUserDataFromReferralSystem();
+                    await loadReferralLink();
                 } catch (e) {
                     console.error('Failed processing Telegram user:', e);
+                    // Fallback to ensureUserExists if Telegram processing fails
+                    await ensureUserExists();
+                    await updateUserDataFromReferralSystem();
+                    await loadReferralLink();
                 }
+            } else {
+                // No Telegram data, use fallback
+                await ensureUserExists();
+                await updateUserDataFromReferralSystem();
+                await loadReferralLink();
             }
+        } else {
+            // No Telegram WebApp, use fallback
+            await ensureUserExists();
+            await updateUserDataFromReferralSystem();
+            await loadReferralLink();
         }
     } catch (e) {
-        console.warn('Telegram WebApp init skipped:', e);
+        console.warn('Telegram WebApp init failed, using fallback:', e);
+        // Fallback to ensureUserExists if Telegram processing fails
+        await ensureUserExists();
+        await updateUserDataFromReferralSystem();
+        await loadReferralLink();
     }
     
     // Add smooth transitions to all screens

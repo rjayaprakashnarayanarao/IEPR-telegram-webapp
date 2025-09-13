@@ -300,6 +300,8 @@ router.post('/process-referral', async (req, res) => {
     try {
         const { telegramId, referralCode, username } = req.body;
         
+        console.log('Processing referral:', { telegramId, referralCode, username });
+        
         if (!telegramId) {
             return res.status(400).json({ error: 'Telegram ID is required' });
         }
@@ -307,6 +309,7 @@ router.post('/process-referral', async (req, res) => {
         // Check if user already exists
         const existingUser = await User.findOne({ telegramId });
         if (existingUser) {
+            console.log('User already exists:', existingUser._id);
             // Update username if provided and different
             if (username && username !== existingUser.username) {
                 existingUser.username = username;
@@ -326,6 +329,9 @@ router.post('/process-referral', async (req, res) => {
             const referrer = await User.findOne({ referralCode });
             if (referrer) {
                 referrerId = referrer._id;
+                console.log('Found referrer:', referrerId, 'for code:', referralCode);
+            } else {
+                console.log('Referrer not found for code:', referralCode);
             }
         }
 
@@ -344,9 +350,11 @@ router.post('/process-referral', async (req, res) => {
         });
 
         await user.save();
+        console.log('Created new user:', user._id, 'with referrer:', referrerId);
 
         // Process referral rewards if user has a referrer
         if (referrerId) {
+            console.log('Processing referral rewards for referrer:', referrerId, 'new user:', user._id);
             await processReferralRewards(referrerId, user._id);
         }
 
@@ -385,12 +393,21 @@ router.get('/referral-code/:code', async (req, res) => {
 // Process referral rewards when a new user joins
 async function processReferralRewards(referrerId, newUserId) {
     try {
+        console.log('processReferralRewards called with:', { referrerId, newUserId });
+        
         const referrer = await User.findById(referrerId);
-        if (!referrer) return false;
+        if (!referrer) {
+            console.log('Referrer not found:', referrerId);
+            return false;
+        }
+
+        console.log('Referrer found:', referrer._id, 'Current L1 count:', referrer.referrals.L1.length);
 
         // Add new user to referrer's L1 referrals
         referrer.referrals.L1.push(newUserId);
         await referrer.save();
+        
+        console.log('Added new user to L1 referrals. New L1 count:', referrer.referrals.L1.length);
 
         // Calculate and distribute L1 reward (25% of $30 = $7.50)
         const l1Reward = REFERRAL_CONFIG.INVESTMENT_AMOUNT * REFERRAL_CONFIG.L1_REWARD_PERCENTAGE / 100;
@@ -399,6 +416,12 @@ async function processReferralRewards(referrerId, newUserId) {
         // Increase coin limit by 75 coins (25% bonus of $30 -> 7.5$ -> 75 coins)
         referrer.coinLimitTotal = Number(referrer.coinLimitTotal || 0) + 75;
         await referrer.save();
+        
+        console.log('Updated referrer earnings:', {
+            earnings: referrer.earnings,
+            totalEarnings: referrer.totalEarnings,
+            coinLimitTotal: referrer.coinLimitTotal
+        });
 
         // Check for L1 milestone bonus (every 5 L1 referrals)
         const l1Count = referrer.referrals.L1.length;
@@ -406,6 +429,7 @@ async function processReferralRewards(referrerId, newUserId) {
         const bonusMilestones = newMilestones - referrer.l1MilestoneBonuses;
 
         if (bonusMilestones > 0) {
+            console.log('Processing L1 milestone bonus:', { l1Count, newMilestones, bonusMilestones });
             const l1Bonus = bonusMilestones * REFERRAL_CONFIG.INVESTMENT_AMOUNT * REFERRAL_CONFIG.L1_BONUS_PERCENTAGE / 100;
             referrer.earnings += l1Bonus;
             referrer.totalEarnings += l1Bonus;
@@ -419,6 +443,7 @@ async function processReferralRewards(referrerId, newUserId) {
         // Check for L2 milestone bonus (when L1 users have 25 L2 referrals total)
         await checkL2MilestoneBonus(referrerId);
 
+        console.log('Referral rewards processed successfully');
         return true;
     } catch (error) {
         console.error('Error processing referral rewards:', error);

@@ -1,5 +1,8 @@
 // Telegram Bot Integration Example
 // This file shows how to integrate the referral system with a Telegram bot
+// 
+// NOTE: This example uses the old localStorage-based system for demonstration purposes.
+// In production, use the MongoDB-based system (referral-system-mongodb.js) with API calls.
 
 // Example Telegram Bot API integration
 class TelegramBotIntegration {
@@ -11,8 +14,9 @@ class TelegramBotIntegration {
     // Handle /start command with referral parameter
     async handleStart(chatId, username, startParam) {
         try {
-            // Initialize user in referral system
-            const user = window.telegramIntegration.initBot(chatId.toString(), startParam);
+        // Initialize user in referral system (using MongoDB system)
+        // Note: This example uses the old localStorage system for demonstration
+        // In production, use the MongoDB-based system via API calls
             
             const welcomeMessage = `
 🎉 Welcome to IEPR Smart Network!
@@ -68,7 +72,9 @@ Share this link to earn rewards!
 
     // Show user statistics
     async showStats(chatId) {
-        const stats = window.telegramIntegration.getUserStats(chatId.toString());
+        // Note: This example uses the old localStorage system for demonstration
+        // In production, use the MongoDB-based system via API calls
+        const stats = window.telegramIntegration?.getUserStats?.(chatId.toString());
         
         if (stats) {
             const statsMessage = `
@@ -85,58 +91,25 @@ Your Level: ${stats.level}
             
             await this.sendMessage(chatId, statsMessage);
         } else {
-            await this.sendMessage(chatId, "No statistics available.");
+            await this.sendMessage(chatId, "No statistics available. Use the MongoDB-based system for production.");
         }
     }
 
     // Show user referrals by level
     async showReferrals(chatId) {
-        const stats = window.telegramIntegration.getUserStats(chatId.toString());
+        // Note: This example uses the old localStorage system for demonstration
+        // In production, use the MongoDB-based system via API calls
+        const stats = window.telegramIntegration?.getUserStats?.(chatId.toString());
         
         if (stats && stats.totalReferrals > 0) {
             let referralsMessage = "👥 Your Referrals:\n\n";
+            referralsMessage += "Note: This is a demo using the old system.\n";
+            referralsMessage += "In production, use the MongoDB-based system.\n\n";
             
-            if (stats.level1Count > 0) {
-                referralsMessage += `Level 1 (${stats.level1Count}/3):\n`;
-                // Get actual referral users
-                for (const [userId, user] of window.referralSystem.users) {
-                    if (user.telegramId === chatId.toString()) {
-                        const level1Users = window.referralSystem.getUsersByLevel(userId, 1);
-                        level1Users.forEach(refUser => {
-                            referralsMessage += `• User ${refUser.id} (${refUser.joined})\n`;
-                        });
-                        break;
-                    }
-                }
-                referralsMessage += "\n";
-            }
-            
-            if (stats.level2Count > 0) {
-                referralsMessage += `Level 2 (${stats.level2Count}/9):\n`;
-                for (const [userId, user] of window.referralSystem.users) {
-                    if (user.telegramId === chatId.toString()) {
-                        const level2Users = window.referralSystem.getUsersByLevel(userId, 2);
-                        level2Users.forEach(refUser => {
-                            referralsMessage += `• User ${refUser.id} (${refUser.joined})\n`;
-                        });
-                        break;
-                    }
-                }
-                referralsMessage += "\n";
-            }
-            
-            if (stats.level3Count > 0) {
-                referralsMessage += `Level 3 (${stats.level3Count}/27):\n`;
-                for (const [userId, user] of window.referralSystem.users) {
-                    if (user.telegramId === chatId.toString()) {
-                        const level3Users = window.referralSystem.getUsersByLevel(userId, 3);
-                        level3Users.forEach(refUser => {
-                            referralsMessage += `• User ${refUser.id} (${refUser.joined})\n`;
-                        });
-                        break;
-                    }
-                }
-            }
+            referralsMessage += `Total Referrals: ${stats.totalReferrals}\n`;
+            referralsMessage += `Level 1: ${stats.level1Count}/3\n`;
+            referralsMessage += `Level 2: ${stats.level2Count}/9\n`;
+            referralsMessage += `Level 3: ${stats.level3Count}/27\n`;
             
             await this.sendMessage(chatId, referralsMessage);
         } else {
@@ -146,7 +119,9 @@ Your Level: ${stats.level}
 
     // Show earnings
     async showEarnings(chatId) {
-        const stats = window.telegramIntegration.getUserStats(chatId.toString());
+        // Note: This example uses the old localStorage system for demonstration
+        // In production, use the MongoDB-based system via API calls
+        const stats = window.telegramIntegration?.getUserStats?.(chatId.toString());
         
         if (stats) {
             const earningsMessage = `
@@ -157,18 +132,23 @@ Level 1 Earnings: ${(stats.level1Count * 0.05).toFixed(2)} TON
 Level 2 Earnings: ${(stats.level2Count * 0.03).toFixed(2)} TON
 Level 3 Earnings: ${(stats.level3Count * 0.01).toFixed(2)} TON
 
+Note: This is a demo using the old system.
+In production, use the MongoDB-based system.
+
 Keep referring users to earn more!
             `;
             
             await this.sendMessage(chatId, earningsMessage);
         } else {
-            await this.sendMessage(chatId, "No earnings data available.");
+            await this.sendMessage(chatId, "No earnings data available. Use the MongoDB-based system for production.");
         }
     }
 
     // Share referral link
     async shareReferralLink(chatId) {
-        const referralLink = window.telegramIntegration.getReferralLink(chatId.toString());
+        // Note: This example uses the old localStorage system for demonstration
+        // In production, use the MongoDB-based system via API calls
+        const referralLink = window.telegramIntegration?.getReferralLink?.(chatId.toString());
         
         if (referralLink) {
             const shareMessage = `
@@ -181,11 +161,14 @@ When someone joins using your link, you'll earn rewards!
 Level 1: 0.05 TON per referral
 Level 2: 0.03 TON per referral  
 Level 3: 0.01 TON per referral
+
+Note: This is a demo using the old system.
+In production, use the MongoDB-based system.
             `;
             
             await this.sendMessage(chatId, shareMessage);
         } else {
-            await this.sendMessage(chatId, "Unable to generate referral link.");
+            await this.sendMessage(chatId, "Unable to generate referral link. Use the MongoDB-based system for production.");
         }
     }
 
