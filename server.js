@@ -4,6 +4,10 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const https = require('https');
 const http = require('http');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { logger, requestLogger } = require('./utils/logger');
+const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 require('dotenv').config();
 
 const app = express();
@@ -11,9 +15,69 @@ const PORT = process.env.PORT || 3000;
 const ENABLE_TELEGRAM_BOT = process.env.ENABLE_TELEGRAM_BOT === 'true';
 
 // Middleware
-app.use(cors());
-app.use(bodyParser.json());
-app.use(express.static('.')); // Serve static files from current directory
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+// Security headers
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            scriptSrc: ["'self'", "https://telegram.org", "https://unpkg.com"],
+            imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'", "https://tonapi.io", "https://toncenter.com"]
+        }
+    }
+}));
+
+// CORS configuration
+app.use(cors({
+    origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : true,
+    credentials: true,
+    optionsSuccessStatus: 200,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// Body parsing
+app.use(bodyParser.json({ 
+    limit: process.env.BODY_LIMIT || '200kb',
+    verify: (req, res, buf) => {
+        req.rawBody = buf;
+    }
+}));
+app.use(bodyParser.urlencoded({ extended: true, limit: '200kb' }));
+
+// Request logging
+app.use(requestLogger);
+
+// Serve static files
+app.use(express.static('.'));
+
+// Rate limiting
+const generalLimiter = rateLimit({
+    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || (15 * 60 * 1000)),
+    max: Number(process.env.RATE_LIMIT_MAX || 500),
+    message: { error: 'Too many requests, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+const strictLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // 10 requests per window
+    message: { error: 'Too many authentication attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+// Apply rate limiting
+app.use('/api/', generalLimiter);
+app.use('/api/admin/login', strictLimiter);
+app.use('/api/referrals/purchase', strictLimiter);
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI || '';
@@ -33,11 +97,10 @@ async function connectToMongo() {
             dbName: 'iepr_system'
         });
         const db = mongoose.connection;
-        console.log('Connected to MongoDB successfully!');
-        console.log('Database:', db.name);
+        logger.info('Connected to MongoDB successfully!', { database: db.name });
     } catch (error) {
-        console.error('MongoDB connection error:', error);
-        console.log('Continuing to run server. Set a valid MONGODB_URI to enable database.');
+        logger.error('MongoDB connection error:', error);
+        logger.warn('Continuing to run server. Set a valid MONGODB_URI to enable database.');
     }
 }
 
@@ -45,6 +108,7 @@ connectToMongo();
 
 // Import routes
 const referralRoutes = require('./routes/referralRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 // Protect DB-dependent routes when DB is not connected/misconfigured
 function requireDatabase(req, res, next) {
@@ -61,6 +125,7 @@ function requireDatabase(req, res, next) {
 
 // Use routes (guarded by DB readiness)
 app.use('/api/referrals', requireDatabase, referralRoutes);
+app.use('/api/admin', requireDatabase, adminRoutes);
 
 // Health check (for Render)
 app.get('/healthz', (req, res) => {
@@ -75,20 +140,26 @@ app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
+// 404 handler for undefined routes
+app.use(notFoundHandler);
+
+// Global error handler (must be last)
+app.use(errorHandler);
+
 // Start server
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Frontend available at: http://localhost:${PORT}`);
+    logger.info(`Server running on port ${PORT}`);
+    logger.info(`Frontend available at: http://localhost:${PORT}`);
     if (ENABLE_TELEGRAM_BOT) {
         try {
             // Lazy-require bot to avoid slowing normal startup if disabled
             const { startTelegramBot } = require('./telegram/bot');
             startTelegramBot();
         } catch (err) {
-            console.error('Failed to start Telegram bot:', err.message);
+            logger.error('Failed to start Telegram bot:', err.message);
         }
     } else {
-        console.log('Telegram bot disabled. Set ENABLE_TELEGRAM_BOT=true to enable.');
+        logger.info('Telegram bot disabled. Set ENABLE_TELEGRAM_BOT=true to enable.');
     }
 
     // Keep-alive ping to prevent server from idling
@@ -101,7 +172,7 @@ app.listen(PORT, () => {
                 const req = client.get(keepAliveUrl, {
                     headers: { 'User-Agent': 'keepalive-pinger/1.0' }
                 }, (res) => {
-                    console.log(`Pinged server: Status Code ${res.statusCode}`);
+                    logger.info(`Pinged server: Status Code ${res.statusCode}`);
                     // Consume response to free sockets
                     res.resume();
                 });
@@ -109,16 +180,16 @@ app.listen(PORT, () => {
                     req.destroy(new Error('Ping request timed out'));
                 });
                 req.on('error', (err) => {
-                    console.error('Error pinging server:', err.message);
+                    logger.error('Error pinging server:', err.message);
                 });
             } catch (e) {
-                console.error('Keep-alive ping failed to start:', e.message);
+                logger.error('Keep-alive ping failed to start:', e.message);
             }
         };
         // Initial ping and schedule every 12 minutes (adjust as needed for host policy)
         ping();
         setInterval(ping, 12 * 60 * 1000);
     } else {
-        console.log('KEEPALIVE_URL not set; skipping keep-alive pings.');
+        logger.info('KEEPALIVE_URL not set; skipping keep-alive pings.');
     }
 });

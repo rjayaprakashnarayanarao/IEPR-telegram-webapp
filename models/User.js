@@ -1,6 +1,14 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
+    // Business identifier for users (e.g., IEPR12345)
+    userId: {
+        type: String,
+        unique: true,
+        sparse: true,
+        index: true,
+        default: null
+    },
     username: {
         type: String,
         default: null
@@ -9,6 +17,12 @@ const userSchema = new mongoose.Schema({
         type: String,
         unique: true,
         sparse: true
+    },
+    // Primary wallet on TON for the user
+    walletAddress: {
+        type: String,
+        default: null,
+        index: true
     },
     referrerId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -23,11 +37,50 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 30 // $30 investment
     },
+    // IND EMPOWER spec fields
+    referralLink: {
+        type: String,
+        default: null
+    },
+    packageActive: {
+        type: Boolean,
+        default: false
+    },
+    packageExpiry: {
+        type: Date,
+        default: null
+    },
+    tokensEntitled: {
+        type: Number,
+        default: 300
+    },
+    tokensClaimed: {
+        type: Number,
+        default: 0
+    },
+    directReferrals: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        index: true
+    }],
+    indirectReferrals: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        index: true
+    }],
+    rewardsBalanceUSDT: {
+        type: Number,
+        default: 0
+    },
+    leadershipStatus: {
+        type: Boolean,
+        default: false
+    },
+    // Legacy fields for backward compatibility
     coins: {
         type: Number,
-        default: 0 // coins start at 0; drip monthly from coinLimitTotal
+        default: 0
     },
-    // Monthly claim tracking
     lastMonthlyClaim: {
         type: Date,
         default: null
@@ -54,16 +107,14 @@ const userSchema = new mongoose.Schema({
             ref: 'User'
         }]
     },
-    // Coins cap and progress
     coinLimitTotal: {
         type: Number,
-        default: 300 // base 300 coins cap
+        default: 300
     },
     coinLimitClaimed: {
         type: Number,
-        default: 0 // how many from the cap have been claimed
+        default: 0
     },
-    // Wallet connection (TON / Telegram WebApp)
     wallet: {
         address: {
             type: String,
@@ -82,16 +133,14 @@ const userSchema = new mongoose.Schema({
             default: null
         }
     },
-    // Track milestone bonuses
     l1MilestoneBonuses: {
         type: Number,
-        default: 0 // Count of 5-L1 milestones reached
+        default: 0
     },
     l2MilestoneBonuses: {
         type: Number,
-        default: 0 // Count of 25-L2 milestones reached
+        default: 0
     },
-    // Unique referral link for each user
     referralCode: {
         type: String,
         unique: true,
@@ -101,9 +150,19 @@ const userSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Index for faster queries
+// Indexes for faster queries
 userSchema.index({ telegramId: 1 });
 userSchema.index({ referrerId: 1 });
 userSchema.index({ referralCode: 1 });
+userSchema.index({ walletAddress: 1 });
+userSchema.index({ userId: 1 });
+userSchema.index({ packageActive: 1 });
+userSchema.index({ packageExpiry: 1 });
+userSchema.index({ leadershipStatus: 1 });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ 'directReferrals': 1 });
+userSchema.index({ 'indirectReferrals': 1 });
+userSchema.index({ tokensClaimed: 1 });
+userSchema.index({ rewardsBalanceUSDT: 1 });
 
 module.exports = mongoose.model('User', userSchema);

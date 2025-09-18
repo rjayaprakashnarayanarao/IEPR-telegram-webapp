@@ -181,9 +181,34 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>IEPR Referral System</h1>
-            <p>Admin Dashboard - MongoDB Data</p>
+            <h1>IND EMPOWER - Admin Dashboard</h1>
+            <p>IEPR Token System Management</p>
         </div>
+
+        <div id="loginPanel" class="data-section" style="display:none; margin-bottom:20px;">
+            <h2>Admin Sign In</h2>
+            <form id="adminLoginForm" style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items:end;">
+                <div>
+                    <label>Username</label>
+                    <input id="adminUser" type="text" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#161713; color:#fff;" />
+                </div>
+                <div>
+                    <label>Password</label>
+                    <input id="adminPass" type="password" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#161713; color:#fff;" />
+                </div>
+                <div>
+                    <label>2FA (TOTP)</label>
+                    <input id="admin2fa" type="text" placeholder="123456" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#161713; color:#fff;" />
+                </div>
+                <div>
+                    <button id="adminLoginBtn" class="refresh-btn" type="submit">Sign in</button>
+                </div>
+            </form>
+            <div id="loginError" class="error" style="margin-top:8px;"></div>
+        </div>
+
+        <div id="adminPanel">
+            <button id="adminLogoutBtn" class="refresh-btn" style="float:right;">Logout</button>
 
         <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
 
@@ -227,14 +252,80 @@
             <div id="usersList" class="loading">Loading users...</div>
         </div>
 
+        </div>
     </div>
 
-    <script src="referral-system-mongodb.js"></script>
     <script>
+        const ADMIN_TOKEN_KEY = 'admin_jwt_token';
+
+        function getAdminToken() {
+            try { return localStorage.getItem(ADMIN_TOKEN_KEY); } catch { return null; }
+        }
+        function setAdminToken(t) {
+            try { t ? localStorage.setItem(ADMIN_TOKEN_KEY, t) : localStorage.removeItem(ADMIN_TOKEN_KEY); } catch {}
+        }
+
+        async function adminLogin(ev) {
+            ev && ev.preventDefault();
+            const u = document.getElementById('adminUser')?.value?.trim();
+            const p = document.getElementById('adminPass')?.value;
+            const t = document.getElementById('admin2fa')?.value?.trim();
+            const btn = document.getElementById('adminLoginBtn');
+            const err = document.getElementById('loginError');
+            if (!u || !p) {
+                if (err) err.textContent = 'Enter username and password';
+                return;
+            }
+            if (err) err.textContent = '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Signing in...'; }
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, password: p, token: t || undefined })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.token) {
+                    if (err) err.textContent = data && data.error ? data.error : 'Login failed';
+                    return;
+                }
+                setAdminToken(data.token);
+                const lp = document.getElementById('loginPanel');
+                const ap = document.getElementById('adminPanel');
+                if (lp) lp.style.display = 'none';
+                if (ap) ap.style.display = 'block';
+                await loadData();
+            } catch (e) {
+                if (err) err.textContent = 'Unable to login. Try again.';
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
+            }
+        }
+
+        function logoutAdmin() {
+            setAdminToken(null);
+            const lp = document.getElementById('loginPanel');
+            const ap = document.getElementById('adminPanel');
+            if (ap) ap.style.display = 'none';
+            if (lp) lp.style.display = 'block';
+        }
+
         async function loadData() {
             try {
-                // Load users
-                const users = await window.referralSystemMongoDB.getAllUsers();
+                const token = getAdminToken();
+                if (!token) {
+                    const lp = document.getElementById('loginPanel');
+                    const ap = document.getElementById('adminPanel');
+                    if (lp) lp.style.display = 'block';
+                    if (ap) ap.style.display = 'none';
+                    return;
+                }
+
+                // Load users via secure admin API
+                const res = await fetch('/api/admin/users?limit=1000', { headers: { 'Authorization': 'Bearer ' + token } });
+                if (res.status === 401) { logoutAdmin(); return; }
+                const payload = await res.json();
+                const users = Array.isArray(payload.users) ? payload.users : [];
 
                 // Update stats
                 document.getElementById('totalUsers').textContent = users.length;
@@ -302,7 +393,7 @@
                         })();
                         const l1 = Array.isArray(user?.referrals?.L1) ? user.referrals.L1.length : 0;
                         const l2 = Array.isArray(user?.referrals?.L2) ? user.referrals.L2.length : 0;
-                        const walletAddr = user.wallet && user.wallet.address ? String(user.wallet.address) : null;
+                        const walletAddr = user.walletAddress || (user.wallet && user.wallet.address ? String(user.wallet.address) : null);
                         const shortAddr = walletAddr ? `${walletAddr.slice(0,6)}…${walletAddr.slice(-6)}` : null;
 
                         return `
@@ -330,8 +421,8 @@
                                 <div class="kv"><strong>Total</strong><div>$${Number(user.totalEarnings || 0).toFixed(2)}</div></div>
                                 <div class="kv"><strong>Joined</strong><div>${user.joinDate ? new Date(user.joinDate).toLocaleDateString() : 'N/A'}</div></div>
                                 <div class="kv"><strong>Wallet</strong><div>${shortAddr ? `<span class=\"mono\" title=\"${walletAddr}\">${shortAddr}</span>` : 'Not connected'}</div></div>
-                                <div class="kv"><strong>Network</strong><div>${user.wallet && user.wallet.network ? user.wallet.network : '-'}</div></div>
-                                <div class="kv"><strong>Provider</strong><div>${user.wallet && user.wallet.provider ? user.wallet.provider : '-'}</div></div>
+                                <div class="kv"><strong>Pkg Active</strong><div>${user.packageActive ? 'Yes' : 'No'}</div></div>
+                                <div class="kv"><strong>Expiry</strong><div>${user.packageExpiry ? new Date(user.packageExpiry).toLocaleDateString() : '-'}</div></div>
                             </div>
                         </div>`;
                     }).join('');
@@ -350,7 +441,20 @@
         }
 
         // Load data on page load
-        document.addEventListener('DOMContentLoaded', loadData);
+        document.addEventListener('DOMContentLoaded', () => {
+            const hasToken = !!getAdminToken();
+            const lp = document.getElementById('loginPanel');
+            const ap = document.getElementById('adminPanel');
+            if (lp) lp.style.display = hasToken ? 'none' : 'block';
+            if (ap) ap.style.display = hasToken ? 'block' : 'none';
+            if (hasToken) loadData();
+            const form = document.getElementById('adminLoginForm');
+            if (form) form.addEventListener('submit', adminLogin);
+            const btn = document.getElementById('adminLoginBtn');
+            if (btn) btn.addEventListener('click', adminLogin);
+            const lo = document.getElementById('adminLogoutBtn');
+            if (lo) lo.addEventListener('click', logoutAdmin);
+        });
     </script>
 </body>
 </html>

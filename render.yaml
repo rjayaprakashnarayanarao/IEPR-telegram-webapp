@@ -1,19 +1,67 @@
 services:
   - type: web
-    name: iepr-referral-system
+    name: ind-empower-iepr-system
     env: node
-    plan: free
+    plan: starter
     buildCommand: npm install && npm run render-build
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
         value: 18
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
       - key: MONGODB_URI
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: ADMIN_JWT_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX
+        value: 100
+      - key: BODY_LIMIT
+        value: 200kb
+      - key: LOG_LEVEL
+        value: info
+      - key: ENABLE_TELEGRAM_BOT
+        value: "false"
+      - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: BOT_USERNAME
         sync: false
-      - key: ENABLE_TELEGRAM_BOT
-        value: "false"
+      - key: KEEPALIVE_URL
+        sync: false
+      - key: TREASURY_WALLET_ADDRESS
+        sync: false
+      - key: PURCHASE_AMOUNT_USDT
+        value: 30
+      - key: USDT_JETTON_ADDRESS
+        sync: false
+      - key: IEPR_JETTON_ADDRESS
+        sync: false
+      - key: IEPR_DECIMALS
+        value: 9
+      - key: USDT_DECIMALS
+        value: 6
+      - key: TONAPI_BASE
+        value: https://tonapi.io
+      - key: TONAPI_KEY
+        sync: false
+      - key: TRANSFER_MODE
+        value: simulate
+      - key: TONCENTER_ENDPOINT
+        value: https://toncenter.com/api/v2
+      - key: TONCENTER_API_KEY
+        sync: false
+      - key: TRANSFER_SIGNER_SECRET
+        sync: false
+      - key: TRANSFER_SIGNER_WORKCHAIN
+        value: 0
     autoDeploy: true
     healthCheckPath: /healthz
     routes:

@@ -1,9 +1,9 @@
 {
-  "url": "{{APP_URL}}",
-  "name": "IEPR Smart Network",
-  "iconUrl": "{{APP_URL}}/images/1000166421.png",
-  "termsOfUseUrl": "{{APP_URL}}",
-  "privacyPolicyUrl": "{{APP_URL}}",
+  "url": "https://indempower.com",
+  "name": "IND EMPOWER",
+  "iconUrl": "https://indempower.com/images/1000166421.png",
+  "termsOfUseUrl": "https://indempower.com/terms",
+  "privacyPolicyUrl": "https://indempower.com/privacy",
   "bridgeUrl": "https://bridge.tonapi.io/bridge"
 }
 
