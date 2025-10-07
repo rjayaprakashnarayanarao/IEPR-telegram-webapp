@@ -1,9 +1,9 @@
 {
-  "url": "https://indempower.com",
+  "url": "http://localhost:3000",
   "name": "IND EMPOWER",
-  "iconUrl": "https://indempower.com/images/1000166421.png",
-  "termsOfUseUrl": "https://indempower.com/terms",
-  "privacyPolicyUrl": "https://indempower.com/privacy",
+  "iconUrl": "http://localhost:3000/images/1000166421.png",
+  "termsOfUseUrl": "http://localhost:3000/terms",
+  "privacyPolicyUrl": "http://localhost:3000/privacy",
   "bridgeUrl": "https://bridge.tonapi.io/bridge"
 }
 

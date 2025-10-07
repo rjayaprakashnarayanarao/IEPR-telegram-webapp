@@ -1,33 +1,77 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const { authenticator } = require('otplib');
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { verifyTwoFA } = require('../middleware/twofa');
 const { audit } = require('../middleware/audit');
+const { OTPService } = require('../services/otpService');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const AdminUser = require('../models/AdminUser');
 
-// Admin login (username/password + optional 2FA token)
-router.post('/login', async (req, res) => {
-    const { username, password, token } = req.body || {};
-    if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
-    const admin = await AdminUser.findOne({ username });
-    if (!admin) return res.status(401).json({ error: 'Invalid credentials' });
-    const ok = await bcrypt.compare(String(password), admin.passwordHash);
-    if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-    if (admin.twoFAEnabled) {
-        if (!token || !authenticator.check(String(token), admin.twoFASecret)) {
-            return res.status(401).json({ error: 'Invalid 2FA token' });
+const otpService = new OTPService();
+
+// Send OTP to admin phone number
+router.post('/send-otp', async (req, res) => {
+    try {
+        const { phoneNumber } = req.body || {};
+        if (!phoneNumber) return res.status(400).json({ error: 'Phone number is required' });
+
+        if (!otpService.isAdminPhone(phoneNumber)) {
+            return res.status(403).json({ error: 'Unauthorized phone number' });
         }
+
+        const result = await otpService.sendOTP(phoneNumber);
+        if (result.success) {
+            res.json({ message: 'OTP sent successfully' });
+        } else {
+            res.status(400).json({ error: result.message });
+        }
+    } catch (error) {
+        console.error('Error sending OTP:', error);
+        res.status(500).json({ error: 'Failed to send OTP' });
     }
-    const payload = { username: admin.username, role: admin.role };
-    const jwtToken = jwt.sign(payload, process.env.ADMIN_JWT_SECRET || 'change-me', { expiresIn: '8h' });
-    admin.lastLoginAt = new Date();
-    await admin.save();
-    res.json({ token: jwtToken });
+});
+
+// Verify OTP and login
+router.post('/verify-otp', async (req, res) => {
+    try {
+        const { phoneNumber, otp } = req.body || {};
+        if (!phoneNumber || !otp) return res.status(400).json({ error: 'Phone number and OTP are required' });
+
+        if (!otpService.isAdminPhone(phoneNumber)) {
+            return res.status(403).json({ error: 'Unauthorized phone number' });
+        }
+
+        const verification = otpService.verifyOTP(phoneNumber, otp);
+        if (!verification.valid) {
+            return res.status(401).json({ error: verification.reason });
+        }
+
+        // Create or update admin user
+        let admin = await AdminUser.findOne({ username: 'admin' });
+        if (!admin) {
+            admin = new AdminUser({
+                username: 'admin',
+                role: 'admin',
+                createdBy: 'otp-system'
+            });
+        }
+        
+        admin.lastLoginAt = new Date();
+        await admin.save();
+
+        // Generate JWT token
+        const payload = { username: admin.username, role: admin.role, phoneNumber };
+        const jwtToken = jwt.sign(payload, process.env.ADMIN_JWT_SECRET || 'change-me', { expiresIn: '8h' });
+        
+        res.json({ 
+            token: jwtToken,
+            message: 'Login successful'
+        });
+    } catch (error) {
+        console.error('Error verifying OTP:', error);
+        res.status(500).json({ error: 'Failed to verify OTP' });
+    }
 });
 
 // Admin: list users

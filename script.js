@@ -6,6 +6,24 @@ let tonConnect = null;
 let currentUser = null;
 let walletAddress = null;
 let isWalletConnected = false;
+let referralLinkPollIntervalId = null;
+let referralLinkCountdownIntervalId = null;
+let referralLinkCountdownSecondsRemaining = 0;
+
+// Local fallback referral code (when backend is unavailable)
+function getOrCreateLocalReferralCode() {
+	try {
+		const key = 'localReferralCode';
+		let code = localStorage.getItem(key);
+		if (code && typeof code === 'string' && code.length >= 6) return code;
+		// Generate simple deterministic-ish code based on time + random
+		code = `loc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+		localStorage.setItem(key, code);
+		return code;
+	} catch {
+		return `loc_${Math.random().toString(36).slice(2, 10)}`;
+	}
+}
 
 // DOM elements
 const screens = document.querySelectorAll('.screen');
@@ -150,6 +168,18 @@ function updateDashboard(data) {
     if (withdrawBtn) {
         withdrawBtn.disabled = (rewards.balanceUSDT || 0) <= 0;
     }
+
+	// Referral link handling on Friends screen
+	const referralLinkAnchor = document.getElementById('referralLinkAnchor');
+	if (referralLinkAnchor) {
+		if (profile && profile.referralLink) {
+			stopReferralLinkWait();
+			referralLinkAnchor.href = profile.referralLink;
+			referralLinkAnchor.textContent = profile.referralLink;
+		} else {
+			startReferralLinkWait();
+		}
+	}
 }
 
 // Show purchase section
@@ -166,6 +196,94 @@ function showDashboardSection() {
     if (purchaseSection) {
         purchaseSection.style.display = 'none';
     }
+}
+
+// Start countdown + polling until referral link is available
+function startReferralLinkWait(timeoutSeconds = 15, pollEveryMs = 1500) {
+	const referralLinkAnchor = document.getElementById('referralLinkAnchor');
+	if (!referralLinkAnchor) return;
+
+	// Avoid duplicating timers
+	if (referralLinkPollIntervalId || referralLinkCountdownIntervalId) return;
+
+	referralLinkCountdownSecondsRemaining = timeoutSeconds;
+	referralLinkAnchor.textContent = `Generating… (${referralLinkCountdownSecondsRemaining}s)`;
+
+	// Countdown UI updater
+	referralLinkCountdownIntervalId = setInterval(() => {
+		referralLinkCountdownSecondsRemaining -= 1;
+		if (referralLinkCountdownSecondsRemaining > 0) {
+			referralLinkAnchor.textContent = `Generating… (${referralLinkCountdownSecondsRemaining}s)`;
+			return;
+		}
+		// Timeout reached
+		stopReferralLinkWait();
+		// Fallback: show a locally generated referral link so users can still share something
+		const fallbackCode = getOrCreateLocalReferralCode();
+		const fallbackLink = `${window.location.origin}/?ref=${fallbackCode}`;
+		referralLinkAnchor.href = fallbackLink;
+		referralLinkAnchor.textContent = fallbackLink;
+		console.error('Referral link not available within the expected time window. Displaying local fallback link.');
+	}, 1000);
+
+	// Poll dashboard for referralLink (only when wallet is available)
+	let lastStatus = null;
+	let lastErrorMessage = null;
+	referralLinkPollIntervalId = setInterval(async () => {
+		if (!walletAddress) return; // wait until wallet is connected
+		try {
+			const res = await fetch(`/api/referrals/dashboard?walletAddress=${encodeURIComponent(walletAddress)}`);
+			lastStatus = res.status;
+			if (res.ok) {
+				const data = await res.json();
+				const link = data && data.profile && data.profile.referralLink;
+				if (link) {
+					stopReferralLinkWait();
+					referralLinkAnchor.href = link;
+					referralLinkAnchor.textContent = link;
+					return;
+				}
+				// Fallback: if we have a userId, try the specific referral-link endpoint
+				const userId = data && data.profile && data.profile.userId;
+				if (userId) {
+					try {
+						const linkRes = await fetch(`/api/referrals/users/${encodeURIComponent(userId)}/referral-link`);
+						if (linkRes.ok) {
+							const linkJson = await linkRes.json();
+							if (linkJson && linkJson.referralLink) {
+								stopReferralLinkWait();
+								referralLinkAnchor.href = linkJson.referralLink;
+								referralLinkAnchor.textContent = linkJson.referralLink;
+								return;
+							}
+						}
+						lastStatus = linkRes.status;
+					} catch (innerErr) {
+						lastErrorMessage = innerErr && innerErr.message ? innerErr.message : String(innerErr);
+					}
+				}
+			} else {
+				// Keep polling; remember last error for timeout logging
+				try {
+					const errJson = await res.json();
+					lastErrorMessage = errJson && (errJson.error || errJson.message) ? (errJson.error || errJson.message) : null;
+				} catch {}
+			}
+		} catch (e) {
+			lastErrorMessage = e && e.message ? e.message : String(e);
+		}
+	}, pollEveryMs);
+}
+
+function stopReferralLinkWait() {
+	if (referralLinkPollIntervalId) {
+		clearInterval(referralLinkPollIntervalId);
+		referralLinkPollIntervalId = null;
+	}
+	if (referralLinkCountdownIntervalId) {
+		clearInterval(referralLinkCountdownIntervalId);
+		referralLinkCountdownIntervalId = null;
+	}
 }
 
 // Purchase package
@@ -354,6 +472,21 @@ function switchScreen(targetScreenId) {
         setTimeout(() => {
             targetScreen.classList.add('active-screen');
         }, 50);
+
+		// If navigating to Friends, ensure referral link UI is updated or countdown starts
+		if (targetScreenId === 'friends') {
+			const referralLinkAnchor = document.getElementById('referralLinkAnchor');
+			if (referralLinkAnchor) {
+				const existingLink = currentUser && currentUser.profile && currentUser.profile.referralLink;
+				if (existingLink) {
+					stopReferralLinkWait();
+					referralLinkAnchor.href = existingLink;
+					referralLinkAnchor.textContent = existingLink;
+				} else {
+					startReferralLinkWait();
+				}
+			}
+		}
     }
 }
 
@@ -397,6 +530,28 @@ function showToast(message, type = 'info') {
 }
 
 // Event listeners
+// Copy to clipboard function
+async function copyToClipboard() {
+    const referralLinkAnchor = document.getElementById('referralLinkAnchor');
+    if (referralLinkAnchor && referralLinkAnchor.href !== '#') {
+        try {
+            await navigator.clipboard.writeText(referralLinkAnchor.href);
+            showToast('Referral link copied to clipboard!', 'success');
+        } catch (err) {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = referralLinkAnchor.href;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            showToast('Referral link copied to clipboard!', 'success');
+        }
+    } else {
+        showToast('Referral link not available yet', 'error');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Initialize TON Connect
     await initializeTonConnect();
@@ -425,6 +580,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Withdrawal
     if (withdrawBtn) {
         withdrawBtn.addEventListener('click', withdrawUSDT);
+    }
+    
+    // Copy button
+    const copyBtn = document.getElementById('copyBtn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', copyToClipboard);
     }
     
     // Initialize page

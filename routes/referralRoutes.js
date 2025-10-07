@@ -472,9 +472,27 @@ router.get('/dashboard', validateDashboard, async (req, res) => {
         const { userId, walletAddress } = req.query || {};
         if (!userId && !walletAddress) return res.status(400).json({ error: 'userId or walletAddress required' });
 
-        const user = userId
+        let user = userId
             ? await User.findById(userId)
             : await User.findOne({ walletAddress });
+        // Auto-create a minimal user when queried by walletAddress and not found, so clients can obtain referral link
+        if (!user && walletAddress) {
+            try {
+                const newReferralCode = await ensureUniqueReferralCode();
+                user = new User({
+                    walletAddress,
+                    referralCode: newReferralCode,
+                    packageActive: false,
+                    packageExpiry: null,
+                    tokensEntitled: 300,
+                    tokensClaimed: 0,
+                    rewardsBalanceUSDT: 0
+                });
+                await user.save();
+            } catch (creationErr) {
+                console.error('Failed to auto-create user on /dashboard:', creationErr);
+            }
+        }
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         // Compute monthly claimable IEPR
@@ -496,10 +514,12 @@ router.get('/dashboard', validateDashboard, async (req, res) => {
         const l1Count = Array.isArray(user.directReferrals) ? user.directReferrals.length : 0;
         const l2Count = Array.isArray(user.indirectReferrals) ? user.indirectReferrals.length : 0;
 
+        // Always compute referralLink from referralCode as a fallback so clients can show/share it
+        const computedReferralLink = `${process.env.APP_URL || 'https://indempower.com'}/?ref=${user.referralCode}`;
         const profile = {
             userId: user.userId,
             walletAddress: user.walletAddress,
-            referralLink: user.referralLink,
+            referralLink: user.referralLink || computedReferralLink,
             packageActive: !!user.packageActive,
             packageExpiry: user.packageExpiry
         };

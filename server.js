@@ -26,9 +26,19 @@ app.use(helmet({
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            scriptSrc: ["'self'", "https://telegram.org", "https://unpkg.com"],
+            scriptSrc: ["'self'", "https://telegram.org", "https://unpkg.com", "'unsafe-inline'"],
+            scriptSrcAttr: ["'unsafe-inline'"],
             imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "https://tonapi.io", "https://toncenter.com"]
+            connectSrc: [
+                "'self'", 
+                "https://tonapi.io", 
+                "https://toncenter.com",
+                "https://config.ton.org",
+                "https://unpkg.com",
+                "https://walletbot.me",
+                "https://bridge.tonapi.io",
+                "wss://bridge.tonapi.io"
+            ]
         }
     }
 }));

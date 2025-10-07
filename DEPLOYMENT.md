@@ -81,11 +81,11 @@ npm run dev
 
 ## Post-Deployment Setup
 
-1. **Set up Admin User**:
-   ```bash
-   # SSH into your Render instance or run locally with production DB
-   node scripts/setup-admin.js
-   ```
+1. **Admin Access**:
+   - Admin login uses OTP system
+   - Phone number: 9390866948
+   - OTP codes are displayed in server console for development
+   - For production, integrate with SMS service
 
 2. **Configure TON Integration**:
    - Get TON API keys from tonapi.io and toncenter.com

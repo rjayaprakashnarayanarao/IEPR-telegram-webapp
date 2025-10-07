@@ -186,24 +186,36 @@
         </div>
 
         <div id="loginPanel" class="data-section" style="display:none; margin-bottom:20px;">
-            <h2>Admin Sign In</h2>
-            <form id="adminLoginForm" style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items:end;">
-                <div>
-                    <label>Username</label>
-                    <input id="adminUser" type="text" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#161713; color:#fff;" />
+            <h2>Admin OTP Login</h2>
+            <div id="phoneStep" class="login-step">
+                <p style="margin-bottom: 20px; color: #B8B3BD;">Enter your admin phone number to receive OTP</p>
+                <div style="display:grid; grid-template-columns: 1fr auto; gap: 12px; align-items:end;">
+                    <div>
+                        <label>Phone Number</label>
+                        <input id="adminPhone" type="tel" placeholder="9390866948" value="9390866948" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#161713; color:#fff;" />
+                    </div>
+                    <div>
+                        <button id="sendOtpBtn" class="refresh-btn" type="button">Get OTP</button>
+                    </div>
                 </div>
-                <div>
-                    <label>Password</label>
-                    <input id="adminPass" type="password" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#161713; color:#fff;" />
+            </div>
+            
+            <div id="otpStep" class="login-step" style="display:none;">
+                <p style="margin-bottom: 20px; color: #B8B3BD;">Enter the 6-digit OTP sent to your phone</p>
+                <div style="display:grid; grid-template-columns: 1fr auto; gap: 12px; align-items:end;">
+                    <div>
+                        <label>OTP Code</label>
+                        <input id="adminOtp" type="text" placeholder="123456" maxlength="6" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#161713; color:#fff;" />
+                    </div>
+                    <div>
+                        <button id="verifyOtpBtn" class="refresh-btn" type="button">Verify & Login</button>
+                    </div>
                 </div>
-                <div>
-                    <label>2FA (TOTP)</label>
-                    <input id="admin2fa" type="text" placeholder="123456" style="width:100%; padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#161713; color:#fff;" />
+                <div style="margin-top: 10px;">
+                    <button id="resendOtpBtn" class="refresh-btn" type="button" style="background: rgba(92, 200, 255, 0.1); color: #5CC8FF; border: 1px solid rgba(92, 200, 255, 0.3);">Resend OTP</button>
                 </div>
-                <div>
-                    <button id="adminLoginBtn" class="refresh-btn" type="submit">Sign in</button>
-                </div>
-            </form>
+            </div>
+            
             <div id="loginError" class="error" style="margin-top:8px;"></div>
         </div>
 
@@ -265,41 +277,90 @@
             try { t ? localStorage.setItem(ADMIN_TOKEN_KEY, t) : localStorage.removeItem(ADMIN_TOKEN_KEY); } catch {}
         }
 
-        async function adminLogin(ev) {
-            ev && ev.preventDefault();
-            const u = document.getElementById('adminUser')?.value?.trim();
-            const p = document.getElementById('adminPass')?.value;
-            const t = document.getElementById('admin2fa')?.value?.trim();
-            const btn = document.getElementById('adminLoginBtn');
+        async function sendOTP() {
+            const phone = document.getElementById('adminPhone')?.value?.trim();
+            const btn = document.getElementById('sendOtpBtn');
             const err = document.getElementById('loginError');
-            if (!u || !p) {
-                if (err) err.textContent = 'Enter username and password';
+            
+            if (!phone) {
+                if (err) err.textContent = 'Enter phone number';
                 return;
             }
+            
             if (err) err.textContent = '';
-            if (btn) { btn.disabled = true; btn.textContent = 'Signing in...'; }
+            if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+            
             try {
-                const res = await fetch('/api/admin/login', {
+                const res = await fetch('/api/admin/send-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: u, password: p, token: t || undefined })
+                    body: JSON.stringify({ phoneNumber: phone })
                 });
                 const data = await res.json();
-                if (!res.ok || !data.token) {
-                    if (err) err.textContent = data && data.error ? data.error : 'Login failed';
+                
+                if (!res.ok) {
+                    if (err) err.textContent = data.error || 'Failed to send OTP';
                     return;
                 }
+                
+                // Show OTP step
+                document.getElementById('phoneStep').style.display = 'none';
+                document.getElementById('otpStep').style.display = 'block';
+                document.getElementById('adminOtp').focus();
+                
+            } catch (e) {
+                if (err) err.textContent = 'Unable to send OTP. Try again.';
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = 'Get OTP'; }
+            }
+        }
+
+        async function verifyOTP() {
+            const phone = document.getElementById('adminPhone')?.value?.trim();
+            const otp = document.getElementById('adminOtp')?.value?.trim();
+            const btn = document.getElementById('verifyOtpBtn');
+            const err = document.getElementById('loginError');
+            
+            if (!phone || !otp) {
+                if (err) err.textContent = 'Enter phone number and OTP';
+                return;
+            }
+            
+            if (err) err.textContent = '';
+            if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+            
+            try {
+                const res = await fetch('/api/admin/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber: phone, otp: otp })
+                });
+                const data = await res.json();
+                
+                if (!res.ok || !data.token) {
+                    if (err) err.textContent = data.error || 'Invalid OTP';
+                    return;
+                }
+                
                 setAdminToken(data.token);
                 const lp = document.getElementById('loginPanel');
                 const ap = document.getElementById('adminPanel');
                 if (lp) lp.style.display = 'none';
                 if (ap) ap.style.display = 'block';
                 await loadData();
+                
             } catch (e) {
-                if (err) err.textContent = 'Unable to login. Try again.';
+                if (err) err.textContent = 'Unable to verify OTP. Try again.';
             } finally {
-                if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
+                if (btn) { btn.disabled = false; btn.textContent = 'Verify & Login'; }
             }
+        }
+
+        function resendOTP() {
+            document.getElementById('otpStep').style.display = 'none';
+            document.getElementById('phoneStep').style.display = 'block';
+            document.getElementById('adminOtp').value = '';
+            document.getElementById('loginError').textContent = '';
         }
 
         function logoutAdmin() {
@@ -448,12 +509,29 @@
             if (lp) lp.style.display = hasToken ? 'none' : 'block';
             if (ap) ap.style.display = hasToken ? 'block' : 'none';
             if (hasToken) loadData();
-            const form = document.getElementById('adminLoginForm');
-            if (form) form.addEventListener('submit', adminLogin);
-            const btn = document.getElementById('adminLoginBtn');
-            if (btn) btn.addEventListener('click', adminLogin);
+            
+            // OTP Login event listeners
+            const sendOtpBtn = document.getElementById('sendOtpBtn');
+            if (sendOtpBtn) sendOtpBtn.addEventListener('click', sendOTP);
+            
+            const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+            if (verifyOtpBtn) verifyOtpBtn.addEventListener('click', verifyOTP);
+            
+            const resendOtpBtn = document.getElementById('resendOtpBtn');
+            if (resendOtpBtn) resendOtpBtn.addEventListener('click', resendOTP);
+            
             const lo = document.getElementById('adminLogoutBtn');
             if (lo) lo.addEventListener('click', logoutAdmin);
+            
+            // Allow Enter key to trigger OTP verification
+            const otpInput = document.getElementById('adminOtp');
+            if (otpInput) {
+                otpInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        verifyOTP();
+                    }
+                });
+            }
         });
     </script>
 </body>

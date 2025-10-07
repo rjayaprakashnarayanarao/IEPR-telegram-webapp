@@ -107,7 +107,7 @@ body {
     );
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    padding: var(--space-4);
+    padding: calc(env(safe-area-inset-top, 0) + var(--space-3)) var(--space-4) var(--space-3) var(--space-4);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -129,7 +129,7 @@ body {
 }
 
 .logo img {
-    height: 36px;
+    height: 40px;
     width: auto;
     max-width: 140px;
     border-radius: var(--radius-sm);
@@ -952,6 +952,33 @@ body {
         padding: var(--space-4);
     }
 }
+/* Mobile-first hero improvements */
+@media (max-width: 480px) {
+    .hero {
+        padding: calc(env(safe-area-inset-top, 0) + var(--space-3)) var(--space-3) var(--space-3) var(--space-3);
+        gap: var(--space-3);
+    }
+    .logo img {
+        height: 36px;
+        max-width: 120px;
+    }
+    .hero-content h1 {
+        font-size: 20px;
+        letter-spacing: 0.2px;
+    }
+    .hero-content p {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 420px) {
+    .hero {
+        justify-content: center;
+        gap: var(--space-3);
+    }
+    .hero .logo { margin-right: var(--space-3); }
+    .hero-content { align-items: flex-start; text-align: left; }
+}
 
 @media (min-width: 768px) {
     body::before {
@@ -1006,6 +1033,13 @@ a:focus-visible {
     flex: 1;
 }
 
+.wallet-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
 .hero-content h1 {
     font-size: var(--font-size-2xl);
     font-weight: var(--font-weight-bold);
@@ -1024,6 +1058,11 @@ a:focus-visible {
     flex-direction: column;
     align-items: center;
     gap: var(--space-2);
+}
+/* Improve TON Connect button sizing in hero */
+.wallet-status .tc-connect-button,
+.wallet-status button {
+    transform: translateZ(0);
 }
 
 /* Purchase Section Styles */

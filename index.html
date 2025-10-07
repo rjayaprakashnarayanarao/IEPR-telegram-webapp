@@ -12,15 +12,18 @@
 <body>
 
     <!-- Hero Section -->
-    <div class="hero">
-        <div class="logo">
-            <img src="images/1000166421.png" alt="IEPR Logo">
+    <div class="hero" role="banner" aria-label="IND EMPOWER header">
+        <div class="logo" aria-hidden="true">
+            <img src="images/1000166421.png" alt="IEPR Logo" width="140" height="40" loading="eager" decoding="async">
         </div>
         <div class="hero-content">
             <h1>IND EMPOWER</h1>
             <p>IEPR Token - Membership System & Referral Rewards</p>
-            <div class="wallet-status" id="walletStatus">
-                <!-- TON Connect will inject the wallet button here -->
+            <div class="wallet-cta">
+                <div class="wallet-status" id="walletStatus" aria-live="polite">
+                    <!-- TON Connect will inject the wallet button here -->
+                    <noscript>Please enable JavaScript to connect your TON wallet.</noscript>
+                </div>
             </div>
         </div>
     </div>
@@ -110,7 +113,7 @@
                     <label>Your Referral Link:</label>
                     <div class="referral-link">
                         <a class="link-text" id="referralLinkAnchor" href="#" target="_blank" rel="noopener">Generating…</a>
-                        <button class="copy-btn" onclick="copyToClipboard()">📋</button>
+                        <button class="copy-btn" id="copyBtn">📋</button>
                     </div>
                 </div>
                 
