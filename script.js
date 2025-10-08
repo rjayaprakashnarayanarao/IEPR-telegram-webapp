@@ -50,11 +50,30 @@ async function initializeTonConnect() {
                     updateWalletStatus();
                     loadUserDashboard();
                     showToast('Wallet connected successfully!', 'success');
+                    
+                    // If currently on home screen, update the display
+                    const currentScreen = document.querySelector('.screen.active-screen');
+                    if (currentScreen && currentScreen.id === 'home') {
+                        // The loadUserDashboard() will handle showing the right section
+                        // but we need to ensure it's visible if user doesn't exist
+                        setTimeout(() => {
+                            if (!currentUser) {
+                                showPurchaseSection();
+                            }
+                        }, 100);
+                    }
                 } else {
                     walletAddress = null;
                     isWalletConnected = false;
+                    currentUser = null; // Clear user data on disconnect
                     updateWalletStatus();
                     showToast('Wallet disconnected', 'info');
+                    
+                    // If currently on home screen, show purchase section
+                    const currentScreen = document.querySelector('.screen.active-screen');
+                    if (currentScreen && currentScreen.id === 'home') {
+                        showPurchaseSection();
+                    }
                 }
             });
             
@@ -110,6 +129,7 @@ async function loadUserDashboard() {
         if (!response.ok) {
             if (response.status === 404) {
                 // User not found, show purchase option
+                currentUser = null;
                 showPurchaseSection();
                 return;
             }
@@ -122,6 +142,8 @@ async function loadUserDashboard() {
         showDashboardSection();
     } catch (error) {
         console.error('Failed to load dashboard:', error);
+        currentUser = null;
+        showPurchaseSection(); // Show purchase section on error too
         showToast('Failed to load dashboard data', 'error');
     }
 }
@@ -195,6 +217,19 @@ function showDashboardSection() {
     const purchaseSection = document.getElementById('purchaseSection');
     if (purchaseSection) {
         purchaseSection.style.display = 'none';
+    }
+}
+
+// Refresh home screen display based on current state
+function refreshHomeScreen() {
+    if (isWalletConnected && walletAddress) {
+        if (currentUser && currentUser.profile && currentUser.profile.packageActive) {
+            showDashboardSection();
+        } else {
+            showPurchaseSection();
+        }
+    } else {
+        showPurchaseSection();
     }
 }
 
@@ -330,8 +365,14 @@ async function purchasePackage() {
         const result = await response.json();
         showToast('Package purchased successfully!', 'success');
         
-        // Reload dashboard
+        // Reload dashboard and refresh home screen
         await loadUserDashboard();
+        
+        // If currently on home screen, refresh the display
+        const currentScreen = document.querySelector('.screen.active-screen');
+        if (currentScreen && currentScreen.id === 'home') {
+            refreshHomeScreen();
+        }
         
     } catch (error) {
         console.error('Purchase failed:', error);
@@ -485,6 +526,22 @@ function switchScreen(targetScreenId) {
 				} else {
 					startReferralLinkWait();
 				}
+			}
+		}
+
+		// If navigating to Home, check user status and show appropriate section
+		if (targetScreenId === 'home') {
+			if (isWalletConnected && walletAddress) {
+				// If user exists and has active package, show dashboard section
+				if (currentUser && currentUser.profile && currentUser.profile.packageActive) {
+					showDashboardSection();
+				} else {
+					// If user doesn't exist or doesn't have active package, show purchase section
+					showPurchaseSection();
+				}
+			} else {
+				// If wallet not connected, show purchase section
+				showPurchaseSection();
 			}
 		}
     }
