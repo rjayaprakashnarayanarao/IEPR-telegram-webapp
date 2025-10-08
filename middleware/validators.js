@@ -20,11 +20,13 @@ function validatePurchaseWithCustomLogic(rules) {
         // Custom validation: either walletAddress or telegramId must be provided
         const { walletAddress, telegramId } = req.body || {};
         if (!walletAddress && !telegramId) {
-            errors.array().push({
+            const errorArray = errors.array();
+            errorArray.push({
                 field: 'walletAddress',
                 message: 'Either walletAddress or telegramId is required',
                 value: undefined
             });
+            return res.status(400).json({ error: 'validation_failed', details: errorArray });
         }
         
         if (!errors.isEmpty()) {

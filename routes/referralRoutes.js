@@ -178,7 +178,7 @@ router.post('/purchase', validatePurchase, async (req, res) => {
         user.packageExpiry = expiry;
         user.tokensEntitled = 300;
         user.tokensClaimed = 0;
-        user.referralLink = `${process.env.APP_URL || 'https://indempower.com'}/?ref=${user.referralCode}`;
+        user.referralLink = `${process.env.APP_URL || 'https://iepr-telegram-webapp.onrender.com'}/?ref=${user.referralCode}`;
 
         await user.save();
 
@@ -515,7 +515,7 @@ router.get('/dashboard', validateDashboard, async (req, res) => {
         const l2Count = Array.isArray(user.indirectReferrals) ? user.indirectReferrals.length : 0;
 
         // Always compute referralLink from referralCode as a fallback so clients can show/share it
-        const computedReferralLink = `${process.env.APP_URL || 'https://indempower.com'}/?ref=${user.referralCode}`;
+        const computedReferralLink = `${process.env.APP_URL || 'https://iepr-telegram-webapp.onrender.com'}/?ref=${user.referralCode}`;
         const profile = {
             userId: user.userId,
             walletAddress: user.walletAddress,
@@ -596,7 +596,7 @@ router.get('/users/:userId/referral-link', async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
         
-        const referralLink = `${process.env.APP_URL || 'https://indempower.com'}/?ref=${user.referralCode}`;
+        const referralLink = `${process.env.APP_URL || 'https://iepr-telegram-webapp.onrender.com'}/?ref=${user.referralCode}`;
         res.json({ 
             referralLink,
             referralCode: user.referralCode

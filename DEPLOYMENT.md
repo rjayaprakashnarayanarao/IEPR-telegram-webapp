@@ -36,7 +36,7 @@ cp .env.example .env
 - `IEPR_JETTON_ADDRESS`: IEPR Jetton master address
 
 ### Application
-- `APP_URL`: Your production URL (e.g., https://indempower.com)
+- `APP_URL`: Your production URL (e.g., https://iepr-telegram-webapp.onrender.com)
 - `ALLOWED_ORIGINS`: Comma-separated list of allowed origins
 
 ## Local Development
