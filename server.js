@@ -145,6 +145,23 @@ app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
 });
 
+// TON Connect Manifest (dynamic for dev/prod)
+app.get('/tonconnect-manifest.json', (req, res) => {
+    const baseUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+    const manifest = {
+        url: baseUrl,
+        name: "IND EMPOWER",
+        iconUrl: `${baseUrl}/images/1000166421.png`,
+        termsOfUseUrl: `${baseUrl}/terms`,
+        privacyPolicyUrl: `${baseUrl}/privacy`,
+        bridgeUrl: "https://bridge.tonapi.io/bridge",
+        universalLink: baseUrl,
+        description: "IEPR Token - Membership System & Referral Rewards",
+        version: "1.0.0"
+    };
+    res.json(manifest);
+});
+
 // Basic route
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');

@@ -1,10 +1,11 @@
 {
-  "url": "http://localhost:3000",
+  "url": "https://iepr-telegram-webapp.onrender.com",
   "name": "IND EMPOWER",
-  "iconUrl": "http://localhost:3000/images/1000166421.png",
-  "termsOfUseUrl": "http://localhost:3000/terms",
-  "privacyPolicyUrl": "http://localhost:3000/privacy",
-  "bridgeUrl": "https://bridge.tonapi.io/bridge"
+  "iconUrl": "https://iepr-telegram-webapp.onrender.com/images/1000166421.png",
+  "termsOfUseUrl": "https://iepr-telegram-webapp.onrender.com/terms",
+  "privacyPolicyUrl": "https://iepr-telegram-webapp.onrender.com/privacy",
+  "bridgeUrl": "https://bridge.tonapi.io/bridge",
+  "universalLink": "https://iepr-telegram-webapp.onrender.com",
+  "description": "IEPR Token - Membership System & Referral Rewards",
+  "version": "1.0.0"
 }
-
-
