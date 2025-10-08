@@ -51,16 +51,10 @@ async function initializeTonConnect() {
                     loadUserDashboard();
                     showToast('Wallet connected successfully!', 'success');
                     
-                    // If currently on home screen, update the display
+                    // If currently on home screen, always show purchase section
                     const currentScreen = document.querySelector('.screen.active-screen');
                     if (currentScreen && currentScreen.id === 'home') {
-                        // The loadUserDashboard() will handle showing the right section
-                        // but we need to ensure it's visible if user doesn't exist
-                        setTimeout(() => {
-                            if (!currentUser) {
-                                showPurchaseSection();
-                            }
-                        }, 100);
+                        showPurchaseSection();
                     }
                 } else {
                     walletAddress = null;
@@ -139,7 +133,7 @@ async function loadUserDashboard() {
         const data = await response.json();
         currentUser = data;
         updateDashboard(data);
-        showDashboardSection();
+        // Don't automatically show dashboard section - let the home screen logic handle it
     } catch (error) {
         console.error('Failed to load dashboard:', error);
         currentUser = null;
@@ -220,17 +214,9 @@ function showDashboardSection() {
     }
 }
 
-// Refresh home screen display based on current state
+// Refresh home screen display - always show purchase section
 function refreshHomeScreen() {
-    if (isWalletConnected && walletAddress) {
-        if (currentUser && currentUser.profile && currentUser.profile.packageActive) {
-            showDashboardSection();
-        } else {
-            showPurchaseSection();
-        }
-    } else {
-        showPurchaseSection();
-    }
+    showPurchaseSection();
 }
 
 // Start countdown + polling until referral link is available
@@ -365,13 +351,13 @@ async function purchasePackage() {
         const result = await response.json();
         showToast('Package purchased successfully!', 'success');
         
-        // Reload dashboard and refresh home screen
+        // Reload dashboard data
         await loadUserDashboard();
         
-        // If currently on home screen, refresh the display
+        // Keep showing purchase section on home screen (users might want to purchase more)
         const currentScreen = document.querySelector('.screen.active-screen');
         if (currentScreen && currentScreen.id === 'home') {
-            refreshHomeScreen();
+            showPurchaseSection();
         }
         
     } catch (error) {
@@ -529,20 +515,9 @@ function switchScreen(targetScreenId) {
 			}
 		}
 
-		// If navigating to Home, check user status and show appropriate section
+		// If navigating to Home, always show purchase section
 		if (targetScreenId === 'home') {
-			if (isWalletConnected && walletAddress) {
-				// If user exists and has active package, show dashboard section
-				if (currentUser && currentUser.profile && currentUser.profile.packageActive) {
-					showDashboardSection();
-				} else {
-					// If user doesn't exist or doesn't have active package, show purchase section
-					showPurchaseSection();
-				}
-			} else {
-				// If wallet not connected, show purchase section
-				showPurchaseSection();
-			}
+			showPurchaseSection();
 		}
     }
 }
@@ -647,6 +622,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Initialize page
     updatePageTitle('home');
+    
+    // Ensure purchase section is visible on home screen by default
+    showPurchaseSection();
     
     // Add smooth transitions
     screens.forEach(screen => {
