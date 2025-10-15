@@ -71,6 +71,7 @@ async function initializeTonConnect() {
                 }
             });
             
+            
             // Check if wallet is already connected
             const wallet = tonConnect.wallet;
             if (wallet && wallet.account) {
