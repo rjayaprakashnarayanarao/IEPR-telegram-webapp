@@ -381,25 +381,38 @@ async function purchasePackage() {
         
         if (appConfig && appConfig.transferMode === 'live' && appConfig.treasuryWallet && appConfig.usdtJetton) {
             // Live mode - create actual TON jetton transfer
-            console.log('🚀 Entering live mode - creating real TON transaction');
+            console.log('🚀 Entering live mode - creating real USDT jetton transfer');
             showToast('Live mode: Initiating USDT jetton transfer...', 'info');
             
             try {
-                // Create USDT jetton transfer transaction
-                const jettonAmount = (appConfig.purchaseAmount * 1000000).toString(); // Convert to raw units (6 decimals)
+                // For TON Connect, we need to create a proper jetton transfer message
+                // The TON Connect SDK will handle the jetton wallet address calculation
+                
+                // Convert amount to raw units (USDT has 6 decimals)
+                const jettonAmount = (appConfig.purchaseAmount * 1000000).toString();
                 
                 console.log('Creating jetton transfer:', {
-                    jettonAddress: appConfig.usdtJetton,
+                    jettonMaster: appConfig.usdtJetton,
                     treasuryWallet: appConfig.treasuryWallet,
                     amount: appConfig.purchaseAmount,
                     rawAmount: jettonAmount
                 });
                 
-                // Create the jetton transfer message
+                // Create the jetton transfer message for TON Connect
+                // TON Connect will automatically calculate the user's jetton wallet address
                 const transferMessage = {
-                    address: appConfig.usdtJetton, // Jetton wallet address
-                    amount: '0.05', // Gas for the transaction
-                    payload: null // Will be set by TON Connect
+                    address: appConfig.usdtJetton, // Jetton master contract address
+                    amount: '0.1', // Gas for the transaction
+                    payload: {
+                        // Jetton transfer payload
+                        jettonTransfer: {
+                            toAddress: appConfig.treasuryWallet,
+                            amount: jettonAmount,
+                            responseAddress: walletAddress,
+                            forwardAmount: '0.05',
+                            forwardPayload: null
+                        }
+                    }
                 };
                 
                 // Send transaction via TON Connect

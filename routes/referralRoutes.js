@@ -5,6 +5,7 @@ const Transaction = require('../models/Transaction');
 const crypto = require('crypto');
 const { PaymentVerifier } = require('../services/paymentVerifier');
 const { JettonTransferService } = require('../services/jettonTransfer');
+const { TonConnectService } = require('../services/tonConnectService');
 const { validatePurchase, validateClaimTokens, validateWithdraw, validateDashboard, validateUserIdParam } = require('../middleware/validators');
 const { asyncHandler } = require('../middleware/errorHandler');
 
@@ -56,6 +57,36 @@ router.get('/debug-env', (req, res) => {
     
     console.log('🔍 Environment variables debug:', envVars);
     res.json(envVars);
+});
+
+// Get jetton wallet address for a user
+router.post('/jetton-wallet', async (req, res) => {
+    try {
+        const { userWalletAddress, jettonMasterAddress } = req.body;
+        
+        if (!userWalletAddress || !jettonMasterAddress) {
+            return res.status(400).json({ error: 'userWalletAddress and jettonMasterAddress are required' });
+        }
+        
+        // Use TonConnectService to calculate jetton wallet address
+        const tonConnectService = new TonConnectService();
+        const jettonWalletAddress = await tonConnectService.calculateJettonWalletAddress(
+            userWalletAddress, 
+            jettonMasterAddress
+        );
+        
+        console.log('🔍 Calculated jetton wallet address:', {
+            userWallet: userWalletAddress,
+            jettonMaster: jettonMasterAddress,
+            jettonWallet: jettonWalletAddress
+        });
+        
+        res.json({ jettonWalletAddress });
+        
+    } catch (error) {
+        console.error('Error calculating jetton wallet address:', error);
+        res.status(500).json({ error: 'Failed to calculate jetton wallet address' });
+    }
 });
 
 // Generate unique referral code
