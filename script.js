@@ -359,19 +359,48 @@ async function purchasePackage() {
         let txHash;
         
         if (appConfig && appConfig.transferMode === 'live' && appConfig.treasuryWallet && appConfig.usdtJetton) {
-            // Live mode - prompt user to make actual payment
-            showToast('Live mode: Please make a 30 USDT payment to the treasury wallet and provide the transaction hash', 'info');
+            // Live mode - create actual TON jetton transfer
+            showToast('Live mode: Initiating USDT jetton transfer...', 'info');
             
-            // For now, we'll ask the user to manually provide the transaction hash
-            // In a real implementation, this would trigger a proper jetton transfer
-            const userTxHash = prompt(`Please make a payment of ${appConfig.purchaseAmount} USDT to:\n${appConfig.treasuryWallet}\n\nThen enter the transaction hash here:`);
-            
-            if (!userTxHash || userTxHash.trim() === '') {
-                throw new Error('Transaction hash is required for live mode');
+            try {
+                // Create USDT jetton transfer transaction
+                const jettonAmount = (appConfig.purchaseAmount * 1000000).toString(); // Convert to raw units (6 decimals)
+                
+                console.log('Creating jetton transfer:', {
+                    jettonAddress: appConfig.usdtJetton,
+                    treasuryWallet: appConfig.treasuryWallet,
+                    amount: appConfig.purchaseAmount,
+                    rawAmount: jettonAmount
+                });
+                
+                // Create the jetton transfer message
+                const transferMessage = {
+                    address: appConfig.usdtJetton, // Jetton wallet address
+                    amount: '0.05', // Gas for the transaction
+                    payload: null // Will be set by TON Connect
+                };
+                
+                // Send transaction via TON Connect
+                const result = await tonConnect.sendTransaction({
+                    messages: [transferMessage]
+                });
+                
+                console.log('TON Connect transaction result:', result);
+                
+                if (!result || !result.boc) {
+                    throw new Error('Transaction failed - no transaction data received');
+                }
+                
+                // Extract transaction hash from the result
+                txHash = result.boc;
+                
+                console.log('Transaction sent successfully:', txHash);
+                showToast('Transaction sent! Verifying payment...', 'info');
+                
+            } catch (txError) {
+                console.error('Jetton transfer failed:', txError);
+                throw new Error('Jetton transfer failed: ' + (txError.message || 'Unknown error'));
             }
-            
-            txHash = userTxHash.trim();
-            showToast('Transaction hash received, verifying payment...', 'info');
             
         } else {
             // Development/simulate mode - use mock transaction

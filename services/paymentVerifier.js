@@ -21,11 +21,22 @@ class PaymentVerifier {
      * Returns { ok, reason?, details? }
      */
     async verifyPurchaseTx(txHash, expectedFromAddress = null) {
-        if (!txHash) return { ok: false, reason: 'missing_txHash' };
+        console.log('🔍 Starting payment verification:', {
+            txHash: txHash?.substring(0, 20) + '...',
+            expectedFromAddress,
+            treasury: this.treasury,
+            usdtJetton: this.usdtJetton,
+            requiredAmount: this.requiredAmount
+        });
+        
+        if (!txHash) {
+            console.log('❌ Verification failed: Missing transaction hash');
+            return { ok: false, reason: 'missing_txHash' };
+        }
         
         // Handle mock transactions for development/testing
         if (txHash.startsWith('mock_') || process.env.NODE_ENV === 'development') {
-            console.log('Mock transaction detected, skipping verification:', txHash);
+            console.log('🧪 Mock transaction detected, skipping verification:', txHash);
             return {
                 ok: true,
                 details: {
@@ -40,35 +51,84 @@ class PaymentVerifier {
             };
         }
         
-        if (!this.treasury) return { ok: false, reason: 'missing_treasury' };
-        if (!this.usdtJetton) return { ok: false, reason: 'missing_usdt_jetton' };
+        if (!this.treasury) {
+            console.log('❌ Verification failed: Missing treasury wallet address');
+            return { ok: false, reason: 'missing_treasury' };
+        }
+        if (!this.usdtJetton) {
+            console.log('❌ Verification failed: Missing USDT jetton address');
+            return { ok: false, reason: 'missing_usdt_jetton' };
+        }
 
         try {
+            console.log('🔍 Fetching transaction from blockchain...');
             const tx = await this.client.getTransactionByHash(txHash);
-            if (!tx) return { ok: false, reason: 'tx_not_found' };
+            if (!tx) {
+                console.log('❌ Transaction not found on blockchain');
+                return { ok: false, reason: 'tx_not_found' };
+            }
+
+            console.log('✅ Transaction found on blockchain:', {
+                hash: tx.hash,
+                lt: tx.lt,
+                timestamp: tx.now,
+                status: tx.success ? 'success' : 'failed'
+            });
 
             // Check if transaction is confirmed (has enough confirmations)
             if (tx.lt && tx.hash) {
-                // Transaction exists and is confirmed
-                console.log('Transaction found:', { hash: tx.hash, lt: tx.lt });
+                console.log('✅ Transaction confirmed:', { hash: tx.hash, lt: tx.lt });
             }
 
+            console.log('🔍 Parsing jetton transfers from transaction...');
             const transfers = this.client.parseJettonTransfers(tx);
+            console.log('📊 Found jetton transfers:', transfers.length);
+            
             if (!Array.isArray(transfers) || transfers.length === 0) {
+                console.log('❌ No jetton transfers found in transaction');
                 return { ok: false, reason: 'no_jetton_transfers' };
             }
 
+            // Log all transfers for debugging
+            transfers.forEach((transfer, index) => {
+                console.log(`📋 Transfer ${index + 1}:`, {
+                    from: transfer.from,
+                    to: transfer.to,
+                    amount: transfer.amount,
+                    jettonAddress: transfer.jettonAddress
+                });
+            });
+
             // Normalize expected amount to raw (integer) if amounts appear raw
             const requiredRaw = this._toRaw(this.requiredAmount, this.amountDecimals);
+            console.log('💰 Expected payment details:', {
+                requiredAmount: this.requiredAmount,
+                requiredRaw: requiredRaw,
+                treasury: this.treasury,
+                usdtJetton: this.usdtJetton
+            });
 
             // Try find matching transfer
-            const match = transfers.find(t =>
-                this._eqAddr(t.to, this.treasury) &&
-                this._eqAddr(t.jettonAddress, this.usdtJetton) &&
-                this._amountMatches(t.amount, requiredRaw)
-            );
+            const match = transfers.find(t => {
+                const toMatch = this._eqAddr(t.to, this.treasury);
+                const jettonMatch = this._eqAddr(t.jettonAddress, this.usdtJetton);
+                const amountMatch = this._amountMatches(t.amount, requiredRaw);
+                
+                console.log('🔍 Checking transfer match:', {
+                    to: t.to,
+                    toMatch,
+                    jettonAddress: t.jettonAddress,
+                    jettonMatch,
+                    amount: t.amount,
+                    amountMatch,
+                    overallMatch: toMatch && jettonMatch && amountMatch
+                });
+                
+                return toMatch && jettonMatch && amountMatch;
+            });
 
             if (!match) {
+                console.log('❌ No matching transfer found');
                 return { 
                     ok: false, 
                     reason: 'no_matching_transfer', 
@@ -83,7 +143,13 @@ class PaymentVerifier {
                 };
             }
 
+            console.log('✅ Found matching transfer:', match);
+
             if (expectedFromAddress && !this._eqAddr(match.from, expectedFromAddress)) {
+                console.log('❌ From address mismatch:', {
+                    expected: expectedFromAddress,
+                    actual: match.from
+                });
                 return { 
                     ok: false, 
                     reason: 'from_mismatch', 
@@ -94,6 +160,7 @@ class PaymentVerifier {
                 };
             }
 
+            console.log('🎉 Payment verification successful!');
             return {
                 ok: true,
                 details: {
@@ -106,7 +173,7 @@ class PaymentVerifier {
                 }
             };
         } catch (error) {
-            console.error('Payment verification error:', error);
+            console.error('💥 Payment verification error:', error);
             return { 
                 ok: false, 
                 reason: 'verification_error', 

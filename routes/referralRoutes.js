@@ -111,15 +111,41 @@ router.post('/users', async (req, res) => {
 
 // POST /purchase → Verify 30 USDT payment, activate package, generate referral
 router.post('/purchase', validatePurchase, async (req, res) => {
+    const startTime = Date.now();
+    console.log('🚀 Purchase request started:', {
+        timestamp: new Date().toISOString(),
+        body: {
+            walletAddress: req.body?.walletAddress?.substring(0, 10) + '...',
+            txHash: req.body?.txHash?.substring(0, 20) + '...',
+            referralCode: req.body?.referralCode,
+            telegramId: req.body?.telegramId,
+            username: req.body?.username
+        }
+    });
+    
     try {
         const { walletAddress, txHash, referralCode, telegramId, username } = req.body || {};
 
-        if (!txHash) return res.status(400).json({ error: 'txHash is required' });
-        if (!walletAddress && !telegramId) return res.status(400).json({ error: 'walletAddress or telegramId required' });
+        if (!txHash) {
+            console.log('❌ Purchase failed: Missing transaction hash');
+            return res.status(400).json({ error: 'txHash is required' });
+        }
+        if (!walletAddress && !telegramId) {
+            console.log('❌ Purchase failed: Missing wallet address or telegram ID');
+            return res.status(400).json({ error: 'walletAddress or telegramId required' });
+        }
 
+        console.log('🔍 Starting payment verification...');
         // Verify on-chain payment
         const verifier = new PaymentVerifier();
         const verification = await verifier.verifyPurchaseTx(txHash, walletAddress || undefined);
+        
+        console.log('📊 Payment verification result:', {
+            success: verification.ok,
+            reason: verification.reason,
+            details: verification.details
+        });
+        
         const txRecordBase = {
             txHash,
             type: 'packagePurchase',
@@ -131,22 +157,41 @@ router.post('/purchase', validatePurchase, async (req, res) => {
         };
 
         if (!verification.ok) {
-            try { await Transaction.create(txRecordBase); } catch {}
-            return res.status(400).json({ error: 'Payment verification failed', reason: verification.reason, details: verification.details || undefined });
+            console.log('❌ Payment verification failed:', verification.reason);
+            try { 
+                await Transaction.create(txRecordBase);
+                console.log('📝 Transaction record created for failed payment');
+            } catch (dbError) {
+                console.error('💥 Failed to create transaction record:', dbError.message);
+            }
+            return res.status(400).json({ 
+                error: 'Payment verification failed', 
+                reason: verification.reason, 
+                details: verification.details || undefined 
+            });
         }
+        
+        console.log('✅ Payment verification successful!');
 
         // Find or create user
+        console.log('👤 Looking up user...');
         let user = null;
         if (walletAddress) {
+            console.log('🔍 Searching by wallet address:', walletAddress.substring(0, 10) + '...');
             user = await User.findOne({ walletAddress });
         }
         if (!user && telegramId) {
+            console.log('🔍 Searching by telegram ID:', telegramId);
             user = await User.findOne({ telegramId: String(telegramId) });
         }
 
         if (!user) {
+            console.log('👤 User not found, creating new user...');
             const newReferralCode = await ensureUniqueReferralCode();
             const businessUserId = await ensureUniqueBusinessUserId();
+            console.log('🎫 Generated referral code:', newReferralCode);
+            console.log('🆔 Generated business user ID:', businessUserId);
+            
             user = new User({
                 userId: businessUserId,
                 telegramId: telegramId ? String(telegramId) : null,
@@ -158,7 +203,14 @@ router.post('/purchase', validatePurchase, async (req, res) => {
                 coinLimitClaimed: 0,
                 referralCode: newReferralCode
             });
+            console.log('✅ New user created with ID:', user._id);
         } else {
+            console.log('✅ Existing user found:', {
+                userId: user._id,
+                businessUserId: user.userId,
+                referralCode: user.referralCode,
+                packageActive: user.packageActive
+            });
             // ensure fields are up to date
             if (!user.userId) user.userId = await ensureUniqueBusinessUserId();
             if (!user.referralCode) user.referralCode = await ensureUniqueReferralCode();
@@ -185,6 +237,14 @@ router.post('/purchase', validatePurchase, async (req, res) => {
         const now = new Date();
         const expiry = new Date(now);
         expiry.setMonth(expiry.getMonth() + 12);
+        
+        console.log('📦 Activating package for user:', {
+            userId: user.userId,
+            packageActive: true,
+            packageExpiry: expiry.toISOString(),
+            tokensEntitled: 300
+        });
+        
         user.packageActive = true;
         user.packageExpiry = expiry;
         user.tokensEntitled = 300;
@@ -192,6 +252,7 @@ router.post('/purchase', validatePurchase, async (req, res) => {
         user.referralLink = `${process.env.APP_URL || 'https://iepr-telegram-webapp.onrender.com'}/?ref=${user.referralCode}`;
 
         await user.save();
+        console.log('✅ User package activated and saved');
 
         // Record transaction
         try {
@@ -201,16 +262,31 @@ router.post('/purchase', validatePurchase, async (req, res) => {
                 userId: user.userId || null,
                 userObjectId: user._id
             });
-        } catch {}
+            console.log('📝 Transaction record created successfully');
+        } catch (dbError) {
+            console.error('💥 Failed to create transaction record:', dbError.message);
+        }
 
         // Distribute referral rewards on successful purchase
         if (user.referrerId) {
+            console.log('🎁 Distributing referral rewards to referrer:', user.referrerId);
             try {
                 await distributeReferralRewards(user.referrerId, user._id);
+                console.log('✅ Referral rewards distributed successfully');
             } catch (e) {
-                console.warn('Reward distribution failed but purchase succeeded:', e?.message || e);
+                console.warn('⚠️ Reward distribution failed but purchase succeeded:', e?.message || e);
             }
+        } else {
+            console.log('ℹ️ No referrer found, skipping reward distribution');
         }
+
+        const processingTime = Date.now() - startTime;
+        console.log('🎉 Purchase completed successfully!', {
+            processingTime: `${processingTime}ms`,
+            userId: user.userId,
+            referralLink: user.referralLink,
+            packageExpiry: user.packageExpiry
+        });
 
         return res.status(200).json({
             activated: true,
@@ -219,7 +295,16 @@ router.post('/purchase', validatePurchase, async (req, res) => {
             packageExpiry: user.packageExpiry
         });
     } catch (error) {
-        console.error('Error in /purchase:', error);
+        const processingTime = Date.now() - startTime;
+        console.error('💥 Purchase failed with error:', {
+            error: error.message,
+            stack: error.stack,
+            processingTime: `${processingTime}ms`,
+            body: {
+                walletAddress: req.body?.walletAddress?.substring(0, 10) + '...',
+                txHash: req.body?.txHash?.substring(0, 20) + '...'
+            }
+        });
         return res.status(500).json({ error: 'Failed to process purchase' });
     }
 });
