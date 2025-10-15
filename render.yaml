@@ -5,6 +5,9 @@ services:
     plan: starter
     buildCommand: npm install && npm run render-build
     startCommand: npm start
+    healthCheckPath: /healthz
+    region: oregon
+    branch: main
     envVars:
       - key: NODE_VERSION
         value: 18
@@ -53,7 +56,7 @@ services:
       - key: TONAPI_KEY
         sync: false
       - key: TRANSFER_MODE
-        value: simulate
+        value: live
       - key: TONCENTER_ENDPOINT
         value: https://toncenter.com/api/v2
       - key: TONCENTER_API_KEY
@@ -63,7 +66,6 @@ services:
       - key: TRANSFER_SIGNER_WORKCHAIN
         value: 0
     autoDeploy: true
-    healthCheckPath: /healthz
     routes:
       - type: rewrite
         source: /

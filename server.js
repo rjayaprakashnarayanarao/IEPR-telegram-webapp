@@ -174,9 +174,9 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
     logger.info(`Server running on port ${PORT}`);
-    logger.info(`Frontend available at: http://localhost:${PORT}`);
+    logger.info(`Frontend available at: http://0.0.0.0:${PORT}`);
     if (ENABLE_TELEGRAM_BOT) {
         try {
             // Lazy-require bot to avoid slowing normal startup if disabled
@@ -219,4 +219,48 @@ app.listen(PORT, () => {
     } else {
         logger.info('KEEPALIVE_URL not set; skipping keep-alive pings.');
     }
+});
+
+// Configure server timeouts for Render
+server.keepAliveTimeout = 120000; // 2 minutes
+server.headersTimeout = 120000; // 2 minutes
+server.timeout = 120000; // 2 minutes
+
+// Handle server errors
+server.on('error', (error) => {
+    if (error.syscall !== 'listen') {
+        throw error;
+    }
+    
+    const bind = typeof PORT === 'string' ? 'Pipe ' + PORT : 'Port ' + PORT;
+    
+    switch (error.code) {
+        case 'EACCES':
+            logger.error(bind + ' requires elevated privileges');
+            process.exit(1);
+            break;
+        case 'EADDRINUSE':
+            logger.error(bind + ' is already in use');
+            process.exit(1);
+            break;
+        default:
+            throw error;
+    }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    logger.info('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+        logger.info('Process terminated');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', () => {
+    logger.info('SIGINT received, shutting down gracefully');
+    server.close(() => {
+        logger.info('Process terminated');
+        process.exit(0);
+    });
 });
