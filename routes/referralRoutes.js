@@ -22,6 +22,17 @@ const REFERRAL_CONFIG = {
     MONTHLY_BASE_COINS: 25
 };
 
+// Get environment configuration
+router.get('/config', (req, res) => {
+    res.json({
+        transferMode: process.env.TRANSFER_MODE || 'simulate',
+        nodeEnv: process.env.NODE_ENV || 'development',
+        treasuryWallet: process.env.TREASURY_WALLET_ADDRESS || null,
+        usdtJetton: process.env.USDT_JETTON_ADDRESS || null,
+        purchaseAmount: process.env.PURCHASE_AMOUNT_USDT || 30
+    });
+});
+
 // Generate unique referral code
 function generateReferralCode() {
     return crypto.randomBytes(8).toString('hex').toUpperCase();

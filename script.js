@@ -8,6 +8,7 @@ let walletAddress = null;
 let isWalletConnected = false;
 let referralLinkPollIntervalId = null;
 let referralLinkCountdownIntervalId = null;
+let appConfig = null;
 let referralLinkCountdownSecondsRemaining = 0;
 
 // Local fallback referral code (when backend is unavailable)
@@ -32,6 +33,35 @@ const purchaseBtn = document.getElementById('purchaseBtn');
 const claimTokensBtn = document.getElementById('claimTokensBtn');
 const withdrawBtn = document.getElementById('withdrawBtn');
 const withdrawAmountInput = document.getElementById('withdrawAmount');
+
+// Load app configuration
+async function loadAppConfig() {
+    try {
+        const response = await fetch('/api/referrals/config');
+        if (response.ok) {
+            appConfig = await response.json();
+            console.log('App config loaded:', appConfig);
+        } else {
+            console.warn('Failed to load app config, using defaults');
+            appConfig = {
+                transferMode: 'simulate',
+                nodeEnv: 'development',
+                treasuryWallet: null,
+                usdtJetton: null,
+                purchaseAmount: 30
+            };
+        }
+    } catch (error) {
+        console.error('Error loading app config:', error);
+        appConfig = {
+            transferMode: 'simulate',
+            nodeEnv: 'development',
+            treasuryWallet: null,
+            usdtJetton: null,
+            purchaseAmount: 30
+        };
+    }
+}
 
 // Initialize TON Connect
 async function initializeTonConnect() {
@@ -70,7 +100,6 @@ async function initializeTonConnect() {
                     }
                 }
             });
-            
             
             // Check if wallet is already connected
             const wallet = tonConnect.wallet;
@@ -315,6 +344,11 @@ async function purchasePackage() {
         return;
     }
     
+    if (!appConfig) {
+        showToast('Loading configuration, please try again', 'error');
+        return;
+    }
+    
     try {
         purchaseBtn.disabled = true;
         purchaseBtn.innerHTML = `
@@ -322,16 +356,31 @@ async function purchasePackage() {
             <span class="btn-icon">⏳</span>
         `;
         
-        showToast('Please complete the payment in your wallet', 'info');
+        let txHash;
         
-        // In a real implementation, you would:
-        // 1. Trigger a TON transaction for 30 USDT
-        // 2. Get the transaction hash
-        // 3. Send it to the backend for verification
+        if (appConfig && appConfig.transferMode === 'live' && appConfig.treasuryWallet && appConfig.usdtJetton) {
+            // Live mode - prompt user to make actual payment
+            showToast('Live mode: Please make a 30 USDT payment to the treasury wallet and provide the transaction hash', 'info');
+            
+            // For now, we'll ask the user to manually provide the transaction hash
+            // In a real implementation, this would trigger a proper jetton transfer
+            const userTxHash = prompt(`Please make a payment of ${appConfig.purchaseAmount} USDT to:\n${appConfig.treasuryWallet}\n\nThen enter the transaction hash here:`);
+            
+            if (!userTxHash || userTxHash.trim() === '') {
+                throw new Error('Transaction hash is required for live mode');
+            }
+            
+            txHash = userTxHash.trim();
+            showToast('Transaction hash received, verifying payment...', 'info');
+            
+        } else {
+            // Development/simulate mode - use mock transaction
+            console.log('Using mock transaction for development mode');
+            txHash = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            showToast('Using development mode - mock transaction created', 'info');
+        }
         
-        // For demo purposes, we'll simulate a transaction
-        const mockTxHash = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
+        // Send to backend for verification
         const response = await fetch('/api/referrals/purchase', {
             method: 'POST',
             headers: {
@@ -339,7 +388,7 @@ async function purchasePackage() {
             },
             body: JSON.stringify({
                 walletAddress: walletAddress,
-                txHash: mockTxHash,
+                txHash: txHash,
                 referralCode: getReferralCodeFromUrl()
             })
         });
@@ -586,6 +635,9 @@ async function copyToClipboard() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Load app configuration first
+    await loadAppConfig();
+    
     // Initialize TON Connect
     await initializeTonConnect();
     
