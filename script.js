@@ -37,12 +37,24 @@ const withdrawAmountInput = document.getElementById('withdrawAmount');
 // Load app configuration
 async function loadAppConfig() {
     try {
-        const response = await fetch('/api/referrals/config');
+        console.log('🔧 Loading app configuration...');
+        const response = await fetch('/api/referrals/config?' + Date.now());
+        console.log('📡 Config response status:', response.status);
+        
         if (response.ok) {
             appConfig = await response.json();
-            console.log('App config loaded:', appConfig);
+            console.log('✅ App config loaded successfully:', appConfig);
+            
+            // Log specific values for debugging
+            console.log('🔍 Config details:', {
+                transferMode: appConfig.transferMode,
+                nodeEnv: appConfig.nodeEnv,
+                hasTreasuryWallet: !!appConfig.treasuryWallet,
+                hasUsdtJetton: !!appConfig.usdtJetton,
+                purchaseAmount: appConfig.purchaseAmount
+            });
         } else {
-            console.warn('Failed to load app config, using defaults');
+            console.warn('❌ Failed to load app config, using defaults. Status:', response.status);
             appConfig = {
                 transferMode: 'simulate',
                 nodeEnv: 'development',
@@ -52,7 +64,7 @@ async function loadAppConfig() {
             };
         }
     } catch (error) {
-        console.error('Error loading app config:', error);
+        console.error('💥 Error loading app config:', error);
         appConfig = {
             transferMode: 'simulate',
             nodeEnv: 'development',
@@ -358,8 +370,18 @@ async function purchasePackage() {
         
         let txHash;
         
+        console.log('🔍 Checking app config for live mode:', {
+            hasAppConfig: !!appConfig,
+            transferMode: appConfig?.transferMode,
+            hasTreasuryWallet: !!appConfig?.treasuryWallet,
+            hasUsdtJetton: !!appConfig?.usdtJetton,
+            treasuryWallet: appConfig?.treasuryWallet,
+            usdtJetton: appConfig?.usdtJetton
+        });
+        
         if (appConfig && appConfig.transferMode === 'live' && appConfig.treasuryWallet && appConfig.usdtJetton) {
             // Live mode - create actual TON jetton transfer
+            console.log('🚀 Entering live mode - creating real TON transaction');
             showToast('Live mode: Initiating USDT jetton transfer...', 'info');
             
             try {

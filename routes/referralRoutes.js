@@ -24,13 +24,38 @@ const REFERRAL_CONFIG = {
 
 // Get environment configuration
 router.get('/config', (req, res) => {
-    res.json({
+    const config = {
         transferMode: process.env.TRANSFER_MODE || 'simulate',
         nodeEnv: process.env.NODE_ENV || 'development',
         treasuryWallet: process.env.TREASURY_WALLET_ADDRESS || null,
         usdtJetton: process.env.USDT_JETTON_ADDRESS || null,
         purchaseAmount: process.env.PURCHASE_AMOUNT_USDT || 30
+    };
+    
+    console.log('🔧 Serving app config:', {
+        transferMode: config.transferMode,
+        nodeEnv: config.nodeEnv,
+        hasTreasuryWallet: !!config.treasuryWallet,
+        hasUsdtJetton: !!config.usdtJetton,
+        purchaseAmount: config.purchaseAmount
     });
+    
+    res.json(config);
+});
+
+// Debug endpoint to check environment variables
+router.get('/debug-env', (req, res) => {
+    const envVars = {
+        TRANSFER_MODE: process.env.TRANSFER_MODE,
+        NODE_ENV: process.env.NODE_ENV,
+        TREASURY_WALLET_ADDRESS: process.env.TREASURY_WALLET_ADDRESS,
+        USDT_JETTON_ADDRESS: process.env.USDT_JETTON_ADDRESS,
+        PURCHASE_AMOUNT_USDT: process.env.PURCHASE_AMOUNT_USDT,
+        allEnvKeys: Object.keys(process.env).filter(key => key.includes('TREASURY') || key.includes('USDT') || key.includes('TRANSFER'))
+    };
+    
+    console.log('🔍 Environment variables debug:', envVars);
+    res.json(envVars);
 });
 
 // Generate unique referral code
