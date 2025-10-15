@@ -39,7 +39,12 @@ function validatePurchaseWithCustomLogic(rules) {
 // Common validators
 const vWallet = body('walletAddress').optional().isString().isLength({ min: 5, max: 200 }).trim();
 const vTxHash = body('txHash').isString().isLength({ min: 10, max: 200 }).trim();
-const vReferralCode = body('referralCode').optional().isString().isLength({ min: 4, max: 64 }).trim();
+const vReferralCode = body('referralCode').optional({ nullable: true }).custom((value) => {
+    if (value === null || value === undefined) return true;
+    if (typeof value !== 'string') throw new Error('Referral code must be a string');
+    if (value.length < 4 || value.length > 64) throw new Error('Referral code must be between 4 and 64 characters');
+    return true;
+});
 const vTelegramId = body('telegramId').optional().isString().isLength({ min: 1, max: 64 }).trim();
 const vUsername = body('username').optional().isString().isLength({ min: 1, max: 64 }).trim();
 
