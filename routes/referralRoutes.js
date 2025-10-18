@@ -687,9 +687,13 @@ router.get('/dashboard', validateDashboard, async (req, res) => {
         const remainingTokens = Math.max(0, entitled - claimed);
         const monthlyClaimable = canClaim ? Math.min(REFERRAL_CONFIG.MONTHLY_BASE_COINS, remainingTokens) : 0;
 
-        // Referral counts
+        // Referral counts - use consistent logic
         const l1Count = Array.isArray(user.directReferrals) ? user.directReferrals.length : 0;
-        const l2Count = Array.isArray(user.indirectReferrals) ? user.indirectReferrals.length : 0;
+        // For L2, count referrals of L1 users (consistent with stats endpoint)
+        // This counts all users who have any of this user's L1 referrals as their referrer
+        const l2Count = await User.countDocuments({
+            referrerId: { $in: user.referrals.L1 }
+        });
 
         // Always compute referralLink from referralCode as a fallback so clients can show/share it
         const computedReferralLink = `${process.env.APP_URL || 'https://iepr-telegram-webapp.onrender.com'}/?ref=${user.referralCode}`;
@@ -1047,20 +1051,43 @@ async function distributeReferralRewards(referrerId, newUserId) {
 
         // Process L2 referral (referrer's referrer)
         if (l1.referrerId) {
+            console.log('🔍 Processing L2 referral for referrer:', l1.referrerId);
             const l2 = await User.findById(l1.referrerId);
             if (l2) {
+                console.log('✅ L2 referrer found:', {
+                    l2Id: l2._id,
+                    l2UserId: l2.userId,
+                    currentIndirectReferrals: l2.indirectReferrals.length,
+                    currentL2Referrals: l2.referrals.L2.length
+                });
+
                 // Add to L2 referrals
                 if (!l2.indirectReferrals.includes(newUserId)) {
                     l2.indirectReferrals.push(newUserId);
+                    console.log('✅ Added to L2 indirectReferrals');
+                } else {
+                    console.log('ℹ️ Already in L2 indirectReferrals');
                 }
                 if (!l2.referrals.L2.includes(newUserId)) {
                     l2.referrals.L2.push(newUserId);
+                    console.log('✅ Added to L2 referrals.L2');
+                } else {
+                    console.log('ℹ️ Already in L2 referrals.L2');
                 }
 
                 // Calculate L2 reward (10% of $30 = $3)
                 const l2Base = REFERRAL_CONFIG.INVESTMENT_AMOUNT * REFERRAL_CONFIG.L2_REWARD_PERCENTAGE / 100;
                 const l2Bonus = l2.leadershipStatus ? (REFERRAL_CONFIG.INVESTMENT_AMOUNT * REFERRAL_CONFIG.LEADERSHIP_BONUS_PERCENTAGE / 100) : 0;
                 const l2Total = l2Base + l2Bonus;
+                
+                console.log('💰 Calculating L2 rewards:', {
+                    l2Base,
+                    l2Bonus,
+                    l2Total,
+                    leadershipStatus: l2.leadershipStatus,
+                    currentBalance: l2.rewardsBalanceUSDT,
+                    currentEarnings: l2.earnings
+                });
                 
                 l2.rewardsBalanceUSDT = Number(l2.rewardsBalanceUSDT || 0) + l2Total;
                 l2.earnings += l2Total;
@@ -1069,10 +1096,23 @@ async function distributeReferralRewards(referrerId, newUserId) {
                 // Check leadership status for L2
                 if (!l2.leadershipStatus && l2.directReferrals.length >= REFERRAL_CONFIG.LEADERSHIP_THRESHOLD) {
                     l2.leadershipStatus = true;
+                    console.log('🎯 L2 user achieved leadership status!');
                 }
 
                 await l2.save();
+                console.log('✅ L2 referrer saved with updated data:', {
+                    newBalance: l2.rewardsBalanceUSDT,
+                    newEarnings: l2.earnings,
+                    newTotalEarnings: l2.totalEarnings,
+                    newIndirectReferralsCount: l2.indirectReferrals.length,
+                    newL2ReferralsCount: l2.referrals.L2.length,
+                    leadershipStatus: l2.leadershipStatus
+                });
+            } else {
+                console.log('❌ L2 referrer not found:', l1.referrerId);
             }
+        } else {
+            console.log('ℹ️ No L2 referrer (L1 user has no referrer)');
         }
 
         return true;
