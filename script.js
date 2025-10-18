@@ -137,10 +137,20 @@ function updateWalletStatus() {
         // Enable purchase button when wallet is connected
         if (purchaseBtn) {
             purchaseBtn.disabled = false;
-            purchaseBtn.innerHTML = `
-                <span class="btn-text">Purchase Package</span>
-                <span class="btn-icon">💳</span>
-            `;
+            
+            // Check if there's a referral code
+            const referralCode = getReferralCodeFromUrl();
+            if (referralCode) {
+                purchaseBtn.innerHTML = `
+                    <span class="btn-text">Purchase Package (Referral: ${referralCode})</span>
+                    <span class="btn-icon">💳</span>
+                `;
+            } else {
+                purchaseBtn.innerHTML = `
+                    <span class="btn-text">Purchase Package</span>
+                    <span class="btn-icon">💳</span>
+                `;
+            }
         }
     } else {
         // Disable purchase button when wallet is not connected
@@ -444,6 +454,10 @@ async function purchasePackage() {
             showToast('Using development mode - mock transaction created', 'info');
         }
         
+        // Get referral code and log it
+        const referralCode = getReferralCodeFromUrl();
+        console.log('🛒 Making purchase with referral code:', referralCode);
+        
         // Send to backend for verification
         const response = await fetch('/api/referrals/purchase', {
             method: 'POST',
@@ -453,17 +467,34 @@ async function purchasePackage() {
             body: JSON.stringify({
                 walletAddress: walletAddress,
                 txHash: txHash,
-                referralCode: getReferralCodeFromUrl()
+                referralCode: referralCode
             })
         });
         
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || 'Purchase failed');
+            console.error('❌ Purchase failed:', error);
+            
+            // Provide more specific error messages
+            if (error.reason === 'tx_not_found') {
+                throw new Error('Transaction not found. Please ensure the transaction was completed and try again.');
+            } else if (error.reason === 'insufficient_amount') {
+                throw new Error('Insufficient payment amount. Please send exactly $30 USDT.');
+            } else if (error.reason === 'invalid_recipient') {
+                throw new Error('Invalid recipient address. Please contact support.');
+            } else {
+                throw new Error(error.error || 'Purchase failed. Please try again.');
+            }
         }
         
         const result = await response.json();
-        showToast('Package purchased successfully!', 'success');
+        
+        // Show success message with referral info
+        if (referralCode) {
+            showToast(`Package purchased successfully! Referral code ${referralCode} was processed.`, 'success');
+        } else {
+            showToast('Package purchased successfully!', 'success');
+        }
         
         // Reload dashboard data
         await loadUserDashboard();
@@ -594,10 +625,35 @@ async function withdrawUSDT() {
     }
 }
 
-// Get referral code from URL
+// Get referral code from URL or Telegram start parameter
 function getReferralCodeFromUrl() {
+    // First try URL parameter
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('ref') || null;
+    const urlRef = urlParams.get('ref');
+    if (urlRef) {
+        console.log('🔗 Found referral code in URL:', urlRef);
+        return urlRef;
+    }
+    
+    // Then try Telegram start parameter
+    if (window.Telegram && window.Telegram.WebApp) {
+        const webApp = window.Telegram.WebApp;
+        const startParam = webApp.initDataUnsafe?.start_param;
+        if (startParam && startParam.startsWith('ref_')) {
+            const telegramRef = startParam.substring(4);
+            console.log('📱 Found referral code in Telegram start param:', telegramRef);
+            return telegramRef;
+        }
+    }
+    
+    // Check if we stored a referral code from Telegram earlier
+    if (window.referralCode) {
+        console.log('💾 Using stored referral code:', window.referralCode);
+        return window.referralCode;
+    }
+    
+    console.log('ℹ️ No referral code found');
+    return null;
 }
 
 // Screen navigation

@@ -277,8 +277,15 @@ router.post('/purchase', validatePurchase, async (req, res) => {
 
         // Link referrer if provided and not already linked
         if (referralCode && !user.referrerId) {
+            console.log('🔍 Looking for referrer with code:', referralCode);
             const referrer = await User.findOne({ referralCode });
             if (referrer && String(referrer._id) !== String(user._id)) {
+                console.log('✅ Found referrer:', {
+                    referrerId: referrer._id,
+                    referrerUserId: referrer.userId,
+                    referrerCode: referrer.referralCode,
+                    currentL1Count: referrer.referrals.L1.length
+                });
                 user.referrerId = referrer._id;
                 // Maintain both legacy and new arrays
                 if (!Array.isArray(referrer.referrals.L1)) referrer.referrals.L1 = [];
@@ -286,7 +293,21 @@ router.post('/purchase', validatePurchase, async (req, res) => {
                 if (!Array.isArray(referrer.directReferrals)) referrer.directReferrals = [];
                 referrer.directReferrals.push(user._id);
                 await referrer.save();
+                console.log('✅ Updated referrer arrays. New L1 count:', referrer.referrals.L1.length);
+            } else {
+                console.log('❌ Referrer not found or same user:', {
+                    referrerFound: !!referrer,
+                    referrerId: referrer?._id,
+                    userId: user._id,
+                    sameUser: referrer ? String(referrer._id) === String(user._id) : false
+                });
             }
+        } else {
+            console.log('ℹ️ Skipping referrer linking:', {
+                hasReferralCode: !!referralCode,
+                hasReferrerId: !!user.referrerId,
+                referralCode: referralCode
+            });
         }
 
         // Activate package (12 months)
@@ -325,7 +346,11 @@ router.post('/purchase', validatePurchase, async (req, res) => {
 
         // Distribute referral rewards on successful purchase
         if (user.referrerId) {
-            console.log('🎁 Distributing referral rewards to referrer:', user.referrerId);
+            console.log('🎁 Distributing referral rewards to referrer:', {
+                referrerId: user.referrerId,
+                newUserId: user._id,
+                newUserWallet: user.walletAddress
+            });
             try {
                 await distributeReferralRewards(user.referrerId, user._id);
                 console.log('✅ Referral rewards distributed successfully');
@@ -333,7 +358,7 @@ router.post('/purchase', validatePurchase, async (req, res) => {
                 console.warn('⚠️ Reward distribution failed but purchase succeeded:', e?.message || e);
             }
         } else {
-            console.log('ℹ️ No referrer found, skipping reward distribution');
+            console.log('ℹ️ No referrer found, skipping reward distribution. User referrerId:', user.referrerId);
         }
 
         const processingTime = Date.now() - startTime;
@@ -958,21 +983,47 @@ router.get('/referral-code/:code', async (req, res) => {
 // Distribute referral rewards for purchase (L1 and L2)
 async function distributeReferralRewards(referrerId, newUserId) {
     try {
+        console.log('🎁 distributeReferralRewards called:', { referrerId, newUserId });
         const l1 = await User.findById(referrerId);
-        if (!l1) return false;
+        if (!l1) {
+            console.log('❌ L1 referrer not found:', referrerId);
+            return false;
+        }
+
+        console.log('✅ L1 referrer found:', {
+            l1Id: l1._id,
+            l1UserId: l1.userId,
+            currentDirectReferrals: l1.directReferrals.length,
+            currentL1Referrals: l1.referrals.L1.length
+        });
 
         // Add to L1 referrals
         if (!l1.directReferrals.includes(newUserId)) {
             l1.directReferrals.push(newUserId);
+            console.log('✅ Added to directReferrals');
+        } else {
+            console.log('ℹ️ Already in directReferrals');
         }
         if (!l1.referrals.L1.includes(newUserId)) {
             l1.referrals.L1.push(newUserId);
+            console.log('✅ Added to referrals.L1');
+        } else {
+            console.log('ℹ️ Already in referrals.L1');
         }
 
         // Calculate L1 reward (20% of $30 = $6)
         const l1Base = REFERRAL_CONFIG.INVESTMENT_AMOUNT * REFERRAL_CONFIG.L1_REWARD_PERCENTAGE / 100;
         const l1Bonus = l1.leadershipStatus ? (REFERRAL_CONFIG.INVESTMENT_AMOUNT * REFERRAL_CONFIG.LEADERSHIP_BONUS_PERCENTAGE / 100) : 0;
         const l1Total = l1Base + l1Bonus;
+        
+        console.log('💰 Calculating L1 rewards:', {
+            l1Base,
+            l1Bonus,
+            l1Total,
+            leadershipStatus: l1.leadershipStatus,
+            currentBalance: l1.rewardsBalanceUSDT,
+            currentEarnings: l1.earnings
+        });
         
         l1.rewardsBalanceUSDT = Number(l1.rewardsBalanceUSDT || 0) + l1Total;
         l1.earnings += l1Total;
@@ -981,9 +1032,18 @@ async function distributeReferralRewards(referrerId, newUserId) {
         // Check leadership status (5+ direct referrals)
         if (!l1.leadershipStatus && l1.directReferrals.length >= REFERRAL_CONFIG.LEADERSHIP_THRESHOLD) {
             l1.leadershipStatus = true;
+            console.log('🎯 L1 user achieved leadership status!');
         }
 
         await l1.save();
+        console.log('✅ L1 referrer saved with updated data:', {
+            newBalance: l1.rewardsBalanceUSDT,
+            newEarnings: l1.earnings,
+            newTotalEarnings: l1.totalEarnings,
+            newDirectReferralsCount: l1.directReferrals.length,
+            newL1ReferralsCount: l1.referrals.L1.length,
+            leadershipStatus: l1.leadershipStatus
+        });
 
         // Process L2 referral (referrer's referrer)
         if (l1.referrerId) {
